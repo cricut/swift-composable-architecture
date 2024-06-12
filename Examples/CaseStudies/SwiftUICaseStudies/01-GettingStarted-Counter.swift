@@ -9,55 +9,57 @@ private let readMe = """
   state of the application and any actions that can affect that state or the outside world.
   """
 
-struct CounterState: Equatable {
-  var count = 0
-}
+@Reducer
+struct Counter {
+  @ObservableState
+  struct State: Equatable {
+    var count = 0
+  }
 
-enum CounterAction: Equatable {
-  case decrementButtonTapped
-  case incrementButtonTapped
-}
+  enum Action {
+    case decrementButtonTapped
+    case incrementButtonTapped
+  }
 
-struct CounterEnvironment {}
-
-let counterReducer = Reducer<CounterState, CounterAction, CounterEnvironment> { state, action, _ in
-  switch action {
-  case .decrementButtonTapped:
-    state.count -= 1
-    return .none
-  case .incrementButtonTapped:
-    state.count += 1
-    return .none
+  var body: some Reducer<State, Action> {
+    Reduce { state, action in
+      switch action {
+      case .decrementButtonTapped:
+        state.count -= 1
+        return .none
+      case .incrementButtonTapped:
+        state.count += 1
+        return .none
+      }
+    }
   }
 }
 
 struct CounterView: View {
-  let store: Store<CounterState, CounterAction>
+  let store: StoreOf<Counter>
 
   var body: some View {
-    WithViewStore(self.store) { viewStore in
-      HStack {
-        Button {
-          viewStore.send(.decrementButtonTapped)
-        } label: {
-          Image(systemName: "minus")
-        }
+    HStack {
+      Button {
+        store.send(.decrementButtonTapped)
+      } label: {
+        Image(systemName: "minus")
+      }
 
-        Text("\(viewStore.count)")
-          .monospacedDigit()
+      Text("\(store.count)")
+        .monospacedDigit()
 
-        Button {
-          viewStore.send(.incrementButtonTapped)
-        } label: {
-          Image(systemName: "plus")
-        }
+      Button {
+        store.send(.incrementButtonTapped)
+      } label: {
+        Image(systemName: "plus")
       }
     }
   }
 }
 
 struct CounterDemoView: View {
-  let store: Store<CounterState, CounterAction>
+  let store: StoreOf<Counter>
 
   var body: some View {
     Form {
@@ -66,7 +68,7 @@ struct CounterDemoView: View {
       }
 
       Section {
-        CounterView(store: self.store)
+        CounterView(store: store)
           .frame(maxWidth: .infinity)
       }
     }
@@ -75,16 +77,12 @@ struct CounterDemoView: View {
   }
 }
 
-struct CounterView_Previews: PreviewProvider {
-  static var previews: some View {
-    NavigationView {
-      CounterDemoView(
-        store: Store(
-          initialState: CounterState(),
-          reducer: counterReducer,
-          environment: CounterEnvironment()
-        )
-      )
-    }
+#Preview {
+  NavigationStack {
+    CounterDemoView(
+      store: Store(initialState: Counter.State()) {
+        Counter()
+      }
+    )
   }
 }

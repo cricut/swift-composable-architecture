@@ -17,7 +17,7 @@ import XCTestDynamicOverlay
 /// effect:
 ///
 /// ```swift
-/// enum FeatureAction: Equatable {
+/// enum Action: Equatable {
 ///   case factButtonTapped
 ///   case factResponse(TaskResult<String>)
 /// }
@@ -26,30 +26,32 @@ import XCTestDynamicOverlay
 /// Then you can model your dependency as using simple `async` and `throws` functionality:
 ///
 /// ```swift
-/// struct FeatureEnvironment {
-///   var numberFact: (Int) async throws -> String
+/// struct NumberFactClient {
+///   var fetch: (Int) async throws -> String
 /// }
 /// ```
 ///
-/// And finally you can use ``Effect/task(priority:operation:catch:file:fileID:line:)`` to construct
-/// an effect in the reducer that invokes the `numberFact` endpoint and wraps its response in a
+/// And finally you can use ``Effect/run(priority:operation:catch:fileID:line:)`` to construct an
+/// effect in the reducer that invokes the `numberFact` endpoint and wraps its response in a
 /// ``TaskResult`` by using its catching initializer, ``TaskResult/init(catching:)``:
 ///
 /// ```swift
 /// case .factButtonTapped:
-///   return .task {
-///     await .factResponse(
-///       TaskResult { try await environment.numberFact(state.number) }
+///   return .run { send in
+///     await send(
+///       .factResponse(
+///         TaskResult { try await self.numberFact.fetch(state.number) }
+///       )
 ///     )
 ///   }
 ///
-/// case .factResponse(.success(fact)):
+/// case let .factResponse(.success(fact)):
 ///   // do something with fact
 ///
 /// case .factResponse(.failure):
 ///   // handle error
 ///
-/// ...
+/// // ...
 /// }
 /// ```
 ///
@@ -71,17 +73,17 @@ import XCTestDynamicOverlay
 /// ```swift
 /// // Set up a failing dependency
 /// struct RefreshFailure: Error {}
-/// store.environment.apiClient.fetchFeed = { throw RefreshFailure() }
+/// store.dependencies.apiClient.fetchFeed = { throw RefreshFailure() }
 ///
 /// // Simulate pull-to-refresh
 /// store.send(.refresh) { $0.isLoading = true }
 ///
 /// // Assert against failure
-/// await store.receive(.refreshResponse(.failure(RefreshFailure())) { // ❌
+/// await store.receive(.refreshResponse(.failure(RefreshFailure())) { // 🛑
 ///   $0.errorLabelText = "An error occurred."
 ///   $0.isLoading = false
 /// }
-/// // ❌ 'RefreshFailure' is not equatable
+/// // 🛑 'RefreshFailure' is not equatable
 /// ```
 ///
 /// To get a passing test, explicitly conform your custom error to the `Equatable` protocol:
@@ -89,7 +91,7 @@ import XCTestDynamicOverlay
 /// ```swift
 /// // Set up a failing dependency
 /// struct RefreshFailure: Error, Equatable {} // 👈
-/// store.environment.apiClient.fetchFeed = { throw RefreshFailure() }
+/// store.dependencies.apiClient.fetchFeed = { throw RefreshFailure() }
 ///
 /// // Simulate pull-to-refresh
 /// store.send(.refresh) { $0.isLoading = true }
@@ -100,6 +102,30 @@ import XCTestDynamicOverlay
 ///   $0.isLoading = false
 /// }
 /// ```
+@available(
+  iOS,
+  deprecated: 9999,
+  message:
+    "Use 'Result', instead. See the following migration guide for more information: https://pointfreeco.github.io/swift-composable-architecture/main/documentation/composablearchitecture/migratingto1.4#Moving-off-of-TaskResult"
+)
+@available(
+  macOS,
+  deprecated: 9999,
+  message:
+    "Use 'Result', instead. See the following migration guide for more information: https://pointfreeco.github.io/swift-composable-architecture/main/documentation/composablearchitecture/migratingto1.4#Moving-off-of-TaskResult"
+)
+@available(
+  tvOS,
+  deprecated: 9999,
+  message:
+    "Use 'Result', instead. See the following migration guide for more information: https://pointfreeco.github.io/swift-composable-architecture/main/documentation/composablearchitecture/migratingto1.4#Moving-off-of-TaskResult"
+)
+@available(
+  watchOS,
+  deprecated: 9999,
+  message:
+    "Use 'Result', instead. See the following migration guide for more information: https://pointfreeco.github.io/swift-composable-architecture/main/documentation/composablearchitecture/migratingto1.4#Moving-off-of-TaskResult"
+)
 public enum TaskResult<Success: Sendable>: Sendable {
   /// A success, storing a `Success` value.
   case success(Success)
@@ -186,6 +212,34 @@ public enum TaskResult<Success: Sendable>: Sendable {
   }
 }
 
+extension TaskResult: CasePathable {
+  public static var allCasePaths: AllCasePaths {
+    AllCasePaths()
+  }
+
+  public struct AllCasePaths {
+    public var success: AnyCasePath<TaskResult, Success> {
+      AnyCasePath(
+        embed: { .success($0) },
+        extract: {
+          guard case let .success(value) = $0 else { return nil }
+          return value
+        }
+      )
+    }
+
+    public var failure: AnyCasePath<TaskResult, Error> {
+      AnyCasePath(
+        embed: { .failure($0) },
+        extract: {
+          guard case let .failure(value) = $0 else { return nil }
+          return value
+        }
+      )
+    }
+  }
+}
+
 extension Result where Success: Sendable, Failure == Error {
   /// Transforms a `TaskResult` into a `Result`.
   ///
@@ -211,28 +265,28 @@ extension TaskResult: Equatable where Success: Equatable {
     case let (.success(lhs), .success(rhs)):
       return lhs == rhs
     case let (.failure(lhs), .failure(rhs)):
-      return _isEqual(lhs, rhs) ?? {
-        #if DEBUG
-          if TaskResultDebugging.emitRuntimeWarnings, type(of: lhs) == type(of: rhs) {
-            runtimeWarning(
-              """
-              '%1$@' is not equatable. …
+      return _isEqual(lhs, rhs)
+        ?? {
+          #if DEBUG
+            let lhsType = type(of: lhs)
+            if TaskResultDebugging.emitRuntimeWarnings, lhsType == type(of: rhs) {
+              let lhsTypeName = typeName(lhsType)
+              runtimeWarn(
+                """
+                "\(lhsTypeName)" is not equatable. …
 
-              To test two values of this type, it must conform to the 'Equatable' protocol. For \
-              example:
+                To test two values of this type, it must conform to the "Equatable" protocol. For \
+                example:
 
-                  extension %1$@: Equatable {}
+                    extension \(lhsTypeName): Equatable {}
 
-              See the documentation of 'TaskResult' for more information.
-              """,
-              [
-                "\(type(of: lhs))",
-              ]
-            )
-          }
-        #endif
-        return false
-      }()
+                See the documentation of "TaskResult" for more information.
+                """
+              )
+            }
+          #endif
+          return false
+        }()
     default:
       return false
     }
@@ -252,19 +306,17 @@ extension TaskResult: Hashable where Success: Hashable {
       } else {
         #if DEBUG
           if TaskResultDebugging.emitRuntimeWarnings {
-            runtimeWarning(
+            let errorType = typeName(type(of: error))
+            runtimeWarn(
               """
-              '%1$@' is not hashable. …
+              "\(errorType)" is not hashable. …
 
-              To hash a value of this type, it must conform to the 'Hashable' protocol. For example:
+              To hash a value of this type, it must conform to the "Hashable" protocol. For example:
 
-                  extension %1$@: Hashable {}
+                  extension \(errorType): Hashable {}
 
-              See the documentation of 'TaskResult' for more information.
-              """,
-              [
-                "\(type(of: error))",
-              ]
+              See the documentation of "TaskResult" for more information.
+              """
             )
           }
         #endif
@@ -279,27 +331,4 @@ extension TaskResult {
   public func get() throws -> Success {
     try self.value
   }
-}
-
-private enum _Witness<A> {}
-
-private protocol _AnyEquatable {
-  static func _isEqual(_ lhs: Any, _ rhs: Any) -> Bool
-}
-
-extension _Witness: _AnyEquatable where A: Equatable {
-  static func _isEqual(_ lhs: Any, _ rhs: Any) -> Bool {
-    guard
-      let lhs = lhs as? A,
-      let rhs = rhs as? A
-    else { return false }
-    return lhs == rhs
-  }
-}
-
-private func _isEqual(_ a: Any, _ b: Any) -> Bool? {
-  func `do`<A>(_: A.Type) -> Bool? {
-    (_Witness<A>.self as? _AnyEquatable.Type)?._isEqual(a, b)
-  }
-  return _openExistential(type(of: a), do: `do`)
 }

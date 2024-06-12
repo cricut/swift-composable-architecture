@@ -1,63 +1,39 @@
-import AuthenticationClient
 import ComposableArchitecture
-import Dispatch
 import LoginCore
 import NewGameCore
 
-public enum AppState: Equatable {
-  case login(LoginState)
-  case newGame(NewGameState)
+@Reducer(state: .equatable)
+public enum TicTacToe {
+  case login(Login)
+  case newGame(NewGame)
 
-  public init() { self = .login(LoginState()) }
-}
+  public static var body: some ReducerOf<Self> {
+    Reduce { state, action in
+      switch action {
+      case .login(.twoFactor(.presented(.twoFactorResponse(.success)))):
+        state = .newGame(NewGame.State())
+        return .none
 
-public enum AppAction: Equatable {
-  case login(LoginAction)
-  case newGame(NewGameAction)
-}
+      case let .login(.loginResponse(.success(response))) where !response.twoFactorRequired:
+        state = .newGame(NewGame.State())
+        return .none
 
-public struct AppEnvironment {
-  public var authenticationClient: AuthenticationClient
+      case .login:
+        return .none
 
-  public init(
-    authenticationClient: AuthenticationClient
-  ) {
-    self.authenticationClient = authenticationClient
-  }
-}
+      case .newGame(.logoutButtonTapped):
+        state = .login(Login.State())
+        return .none
 
-public let appReducer = Reducer<AppState, AppAction, AppEnvironment>.combine(
-  loginReducer.pullback(
-    state: /AppState.login,
-    action: /AppAction.login,
-    environment: {
-      LoginEnvironment(
-        authenticationClient: $0.authenticationClient
-      )
+      case .newGame:
+        return .none
+      }
     }
-  ),
-  newGameReducer.pullback(
-    state: /AppState.newGame,
-    action: /AppAction.newGame,
-    environment: { _ in NewGameEnvironment() }
-  ),
-  Reducer { state, action, _ in
-    switch action {
-    case let .login(.twoFactor(.twoFactorResponse(.success(response)))),
-      let .login(.loginResponse(.success(response))) where !response.twoFactorRequired:
-      state = .newGame(NewGameState())
-      return .none
-
-    case .login:
-      return .none
-
-    case .newGame(.logoutButtonTapped):
-      state = .login(LoginState())
-      return .none
-
-    case .newGame:
-      return .none
+    .ifCaseLet(\.login, action: \.login) {
+      Login()
+    }
+    .ifCaseLet(\.newGame, action: \.newGame) {
+      NewGame()
     }
   }
-)
-.debug()
+}

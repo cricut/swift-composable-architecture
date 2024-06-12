@@ -1,101 +1,103 @@
-import Combine
+import Clocks
 import ComposableArchitecture
 import XCTest
 
 @testable import SwiftUICaseStudies
 
-@MainActor
 final class AnimationTests: XCTestCase {
+  @MainActor
   func testRainbow() async {
-    let mainQueue = DispatchQueue.test
+    let clock = TestClock()
 
-    let store = TestStore(
-      initialState: AnimationsState(),
-      reducer: animationsReducer,
-      environment: AnimationsEnvironment(
-        mainQueue: mainQueue.eraseToAnyScheduler()
-      )
-    )
+    let store = TestStore(initialState: Animations.State()) {
+      Animations()
+    } withDependencies: {
+      $0.continuousClock = clock
+    }
 
     await store.send(.rainbowButtonTapped)
-
-    await store.receive(.setColor(.red)) {
+    await store.receive(\.setColor) {
       $0.circleColor = .red
     }
 
-    await mainQueue.advance(by: .seconds(1))
-    await store.receive(.setColor(.blue)) {
+    await clock.advance(by: .seconds(1))
+    await store.receive(\.setColor) {
       $0.circleColor = .blue
     }
 
-    await mainQueue.advance(by: .seconds(1))
-    await store.receive(.setColor(.green)) {
+    await clock.advance(by: .seconds(1))
+    await store.receive(\.setColor) {
       $0.circleColor = .green
     }
 
-    await mainQueue.advance(by: .seconds(1))
-    await store.receive(.setColor(.orange)) {
+    await clock.advance(by: .seconds(1))
+    await store.receive(\.setColor) {
       $0.circleColor = .orange
     }
 
-    await mainQueue.advance(by: .seconds(1))
-    await store.receive(.setColor(.pink)) {
+    await clock.advance(by: .seconds(1))
+    await store.receive(\.setColor) {
       $0.circleColor = .pink
     }
 
-    await mainQueue.advance(by: .seconds(1))
-    await store.receive(.setColor(.purple)) {
+    await clock.advance(by: .seconds(1))
+    await store.receive(\.setColor) {
       $0.circleColor = .purple
     }
 
-    await mainQueue.advance(by: .seconds(1))
-    await store.receive(.setColor(.yellow)) {
+    await clock.advance(by: .seconds(1))
+    await store.receive(\.setColor) {
       $0.circleColor = .yellow
     }
 
-    await mainQueue.advance(by: .seconds(1))
-    await store.receive(.setColor(.black)) {
+    await clock.advance(by: .seconds(1))
+    await store.receive(\.setColor) {
       $0.circleColor = .black
     }
 
-    await mainQueue.advance(by: .seconds(1))
+    await clock.run()
   }
 
+  @MainActor
   func testReset() async {
-    let mainQueue = DispatchQueue.test
+    let clock = TestClock()
 
-    let store = TestStore(
-      initialState: AnimationsState(),
-      reducer: animationsReducer,
-      environment: AnimationsEnvironment(
-        mainQueue: mainQueue.eraseToAnyScheduler()
-      )
-    )
+    let store = TestStore(initialState: Animations.State()) {
+      Animations()
+    } withDependencies: {
+      $0.continuousClock = clock
+    }
 
     await store.send(.rainbowButtonTapped)
-
-    await store.receive(.setColor(.red)) {
+    await store.receive(\.setColor) {
       $0.circleColor = .red
     }
 
-    await mainQueue.advance(by: .seconds(1))
-    await store.receive(.setColor(.blue)) {
+    await clock.advance(by: .seconds(1))
+    await store.receive(\.setColor) {
       $0.circleColor = .blue
     }
 
     await store.send(.resetButtonTapped) {
-      $0.alert = AlertState(
-        title: TextState("Reset state?"),
-        primaryButton: .destructive(
-          TextState("Reset"),
+      $0.alert = AlertState {
+        TextState("Reset state?")
+      } actions: {
+        ButtonState(
+          role: .destructive,
           action: .send(.resetConfirmationButtonTapped, animation: .default)
-        ),
-        secondaryButton: .cancel(TextState("Cancel"))
-      )
+        ) {
+          TextState("Reset")
+        }
+        ButtonState(role: .cancel) {
+          TextState("Cancel")
+        }
+      }
     }
 
-    await store.send(.resetConfirmationButtonTapped) {
-      $0 = AnimationsState()
+    await store.send(\.alert.resetConfirmationButtonTapped) {
+      $0 = Animations.State()
     }
+
+    await store.finish()
   }
 }

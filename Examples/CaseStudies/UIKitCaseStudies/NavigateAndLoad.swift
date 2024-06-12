@@ -1,70 +1,58 @@
-import Combine
 import ComposableArchitecture
-import SwiftUI
 import UIKit
 
-struct EagerNavigationState: Equatable {
-  var isNavigationActive = false
-  var optionalCounter: CounterState?
-}
+@Reducer
+struct EagerNavigation {
+  @ObservableState
+  struct State: Equatable {
+    var isNavigationActive = false
+    var optionalCounter: Counter.State?
+  }
 
-enum EagerNavigationAction: Equatable {
-  case optionalCounter(CounterAction)
-  case setNavigation(isActive: Bool)
-  case setNavigationIsActiveDelayCompleted
-}
+  enum Action {
+    case optionalCounter(Counter.Action)
+    case setNavigation(isActive: Bool)
+    case setNavigationIsActiveDelayCompleted
+  }
 
-struct EagerNavigationEnvironment {
-  var mainQueue: AnySchedulerOf<DispatchQueue>
-}
+  private enum CancelID { case load }
+  @Dependency(\.continuousClock) var clock
 
-let eagerNavigationReducer =
-  counterReducer
-  .optional()
-  .pullback(
-    state: \.optionalCounter,
-    action: /EagerNavigationAction.optionalCounter,
-    environment: { _ in CounterEnvironment() }
-  )
-  .combined(
-    with: Reducer<
-      EagerNavigationState, EagerNavigationAction, EagerNavigationEnvironment
-    > { state, action, environment in
-
-      enum CancelID {}
-
+  var body: some Reducer<State, Action> {
+    Reduce { state, action in
       switch action {
       case .setNavigation(isActive: true):
         state.isNavigationActive = true
-        return .task {
-          try await environment.mainQueue.sleep(for: 1)
-          return .setNavigationIsActiveDelayCompleted
+        return .run { send in
+          try await self.clock.sleep(for: .seconds(1))
+          await send(.setNavigationIsActiveDelayCompleted)
         }
-        .cancellable(id: CancelID.self)
+        .cancellable(id: CancelID.load)
 
       case .setNavigation(isActive: false):
         state.isNavigationActive = false
         state.optionalCounter = nil
-        return .cancel(id: CancelID.self)
+        return .cancel(id: CancelID.load)
 
       case .setNavigationIsActiveDelayCompleted:
-        state.optionalCounter = CounterState()
+        state.optionalCounter = Counter.State()
         return .none
 
       case .optionalCounter:
         return .none
       }
     }
-  )
+    .ifLet(\.optionalCounter, action: \.optionalCounter) {
+      Counter()
+    }
+  }
+}
 
 class EagerNavigationViewController: UIViewController {
-  var cancellables: [AnyCancellable] = []
-  let store: Store<EagerNavigationState, EagerNavigationAction>
-  let viewStore: ViewStore<EagerNavigationState, EagerNavigationAction>
+  let store: StoreOf<EagerNavigation>
 
-  init(store: Store<EagerNavigationState, EagerNavigationAction>) {
+  init(store: StoreOf<EagerNavigation>) {
     self.store = store
-    self.viewStore = ViewStore(store)
     super.init(nibName: nil, bundle: nil)
   }
 
@@ -75,28 +63,27 @@ class EagerNavigationViewController: UIViewController {
   override func viewDidLoad() {
     super.viewDidLoad()
 
-    self.title = "Navigate and load"
+    title = "Navigate and load"
 
-    self.view.backgroundColor = .systemBackground
+    view.backgroundColor = .systemBackground
 
     let button = UIButton(type: .system)
     button.addTarget(self, action: #selector(loadOptionalCounterTapped), for: .touchUpInside)
     button.setTitle("Load optional counter", for: .normal)
     button.translatesAutoresizingMaskIntoConstraints = false
-    self.view.addSubview(button)
+    view.addSubview(button)
 
     NSLayoutConstraint.activate([
-      button.centerXAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.centerXAnchor),
-      button.centerYAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.centerYAnchor),
+      button.centerXAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerXAnchor),
+      button.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor),
     ])
 
-    self.viewStore.publisher.isNavigationActive.sink { [weak self] isNavigationActive in
-      guard let self = self else { return }
-      if isNavigationActive {
-        self.navigationController?.pushViewController(
+    observe { [weak self] in
+      guard let self else { return }
+      if store.isNavigationActive {
+        navigationController?.pushViewController(
           IfLetStoreController(
-            store: self.store
-              .scope(state: \.optionalCounter, action: EagerNavigationAction.optionalCounter)
+            store.scope(state: \.optionalCounter, action: \.optionalCounter)
           ) {
             CounterViewController(store: $0)
           } else: {
@@ -105,38 +92,30 @@ class EagerNavigationViewController: UIViewController {
           animated: true
         )
       } else {
-        self.navigationController?.popToViewController(self, animated: true)
+        navigationController?.popToViewController(self, animated: true)
       }
     }
-    .store(in: &self.cancellables)
   }
 
   override func viewDidAppear(_ animated: Bool) {
     super.viewDidAppear(animated)
 
-    if !self.isMovingToParent {
-      self.viewStore.send(.setNavigation(isActive: false))
+    if !isMovingToParent && store.isNavigationActive {
+      store.send(.setNavigation(isActive: false))
     }
   }
 
   @objc private func loadOptionalCounterTapped() {
-    self.viewStore.send(.setNavigation(isActive: true))
+    store.send(.setNavigation(isActive: true))
   }
 }
 
-struct EagerNavigationViewController_Previews: PreviewProvider {
-  static var previews: some View {
-    let vc = UINavigationController(
-      rootViewController: EagerNavigationViewController(
-        store: Store(
-          initialState: EagerNavigationState(),
-          reducer: eagerNavigationReducer,
-          environment: EagerNavigationEnvironment(
-            mainQueue: .main
-          )
-        )
-      )
+#Preview {
+  UINavigationController(
+    rootViewController: EagerNavigationViewController(
+      store: Store(initialState: EagerNavigation.State()) {
+        EagerNavigation()
+      }
     )
-    return UIViewRepresented(makeUIView: { _ in vc.view })
-  }
+  )
 }

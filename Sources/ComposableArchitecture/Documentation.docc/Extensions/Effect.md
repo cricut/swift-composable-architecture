@@ -2,43 +2,38 @@
 
 ## Topics
 
-### Creating an Effect
+### Creating an effect
 
 - ``none``
-- ``task(priority:operation:catch:file:fileID:line:)``
-- ``run(priority:operation:catch:file:fileID:line:)``
-- ``fireAndForget(priority:_:)``
+- ``run(priority:operation:catch:fileID:line:)``
+- ``send(_:)``
+- ``EffectOf``
 - ``TaskResult``
 
 ### Cancellation
 
-- ``cancellable(id:cancelInFlight:)-499iv``
-- ``cancel(id:)-7vmd9``
-- ``cancel(ids:)-8gan2``
-- ``cancellable(id:cancelInFlight:)-17skv``
-- ``cancel(id:)-iun1``
-- ``cancel(ids:)-dmwy``
-- ``withTaskCancellation(id:cancelInFlight:operation:)-88kxz``
-- ``withTaskCancellation(id:cancelInFlight:operation:)-4dtr6``
+- ``cancellable(id:cancelInFlight:)``
+- ``cancel(id:)``
+- ``withTaskCancellation(id:cancelInFlight:operation:)``
+- ``_Concurrency/Task/cancel(id:)``
 
 ### Composition
 
-- ``map(_:)-28ghh``
-- ``merge(_:)-3al9f``
-- ``merge(_:)-4n451``
+- ``map(_:)``
+- ``merge(_:)-5ai73``
+- ``merge(_:)-8ckqn``
+- ``merge(with:)``
+- ``concatenate(_:)-3iza9``
+- ``concatenate(_:)-4gba2``
+- ``concatenate(with:)``
 
-### Concurrency
-
-- ``UncheckedSendable``
-
-### Testing
-
-- ``unimplemented(_:)``
-
-### SwiftUI Integration
+### SwiftUI integration
 
 - ``animation(_:)``
+- ``transaction(_:)``
 
-### Deprecations
+### Combine integration
 
-- <doc:EffectDeprecations>
+- ``publisher(_:)``
+- ``debounce(id:for:scheduler:options:)``
+- ``throttle(id:for:scheduler:latest:)``

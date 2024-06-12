@@ -5,106 +5,92 @@ private let readMe = """
   This screen demonstrates how to show and hide views based on the presence of some optional child \
   state.
 
-  The parent state holds a `CounterState?` value. When it is `nil` we will default to a plain text \
-  view. But when it is non-`nil` we will show a view fragment for a counter that operates on the \
-  non-optional counter state.
+  The parent state holds a `Counter.State?` value. When it is `nil` we will default to a plain \
+  text view. But when it is non-`nil` we will show a view fragment for a counter that operates on \
+  the non-optional counter state.
 
   Tapping "Toggle counter state" will flip between the `nil` and non-`nil` counter states.
   """
 
-struct OptionalBasicsState: Equatable {
-  var optionalCounter: CounterState?
-}
+@Reducer
+struct OptionalBasics {
+  @ObservableState
+  struct State: Equatable {
+    var optionalCounter: Counter.State?
+  }
 
-enum OptionalBasicsAction: Equatable {
-  case optionalCounter(CounterAction)
-  case toggleCounterButtonTapped
-}
+  enum Action {
+    case optionalCounter(Counter.Action)
+    case toggleCounterButtonTapped
+  }
 
-struct OptionalBasicsEnvironment {}
-
-let optionalBasicsReducer =
-  counterReducer
-  .optional()
-  .pullback(
-    state: \.optionalCounter,
-    action: /OptionalBasicsAction.optionalCounter,
-    environment: { _ in CounterEnvironment() }
-  )
-  .combined(
-    with: Reducer<
-      OptionalBasicsState, OptionalBasicsAction, OptionalBasicsEnvironment
-    > { state, action, environment in
+  var body: some Reducer<State, Action> {
+    Reduce { state, action in
       switch action {
       case .toggleCounterButtonTapped:
         state.optionalCounter =
           state.optionalCounter == nil
-          ? CounterState()
+          ? Counter.State()
           : nil
         return .none
       case .optionalCounter:
         return .none
       }
     }
-  )
+    .ifLet(\.optionalCounter, action: \.optionalCounter) {
+      Counter()
+    }
+  }
+}
 
 struct OptionalBasicsView: View {
-  let store: Store<OptionalBasicsState, OptionalBasicsAction>
+  let store: StoreOf<OptionalBasics>
 
   var body: some View {
-    WithViewStore(self.store) { viewStore in
-      Form {
-        Section {
-          AboutView(readMe: readMe)
-        }
+    Form {
+      Section {
+        AboutView(readMe: readMe)
+      }
 
-        Button("Toggle counter state") {
-          viewStore.send(.toggleCounterButtonTapped)
-        }
+      Button("Toggle counter state") {
+        store.send(.toggleCounterButtonTapped)
+      }
 
-        IfLetStore(
-          self.store.scope(
-            state: \.optionalCounter,
-            action: OptionalBasicsAction.optionalCounter
-          ),
-          then: { store in
-            Text(template: "`CounterState` is non-`nil`")
-            CounterView(store: store)
-              .buttonStyle(.borderless)
-              .frame(maxWidth: .infinity)
-          },
-          else: {
-            Text(template: "`CounterState` is `nil`")
-          }
-        )
+      if let store = store.scope(state: \.optionalCounter, action: \.optionalCounter) {
+        Text(template: "`Counter.State` is non-`nil`")
+        CounterView(store: store)
+          .buttonStyle(.borderless)
+          .frame(maxWidth: .infinity)
+      } else {
+        Text(template: "`Counter.State` is `nil`")
       }
     }
     .navigationTitle("Optional state")
   }
 }
 
-struct OptionalBasicsView_Previews: PreviewProvider {
-  static var previews: some View {
-    Group {
-      NavigationView {
-        OptionalBasicsView(
-          store: Store(
-            initialState: OptionalBasicsState(),
-            reducer: optionalBasicsReducer,
-            environment: OptionalBasicsEnvironment()
-          )
-        )
+#Preview {
+  NavigationStack {
+    OptionalBasicsView(
+      store: Store(initialState: OptionalBasics.State()) {
+        OptionalBasics()
       }
+    )
+  }
+}
 
-      NavigationView {
-        OptionalBasicsView(
-          store: Store(
-            initialState: OptionalBasicsState(optionalCounter: CounterState(count: 42)),
-            reducer: optionalBasicsReducer,
-            environment: OptionalBasicsEnvironment()
+#Preview("Deep-linked") {
+  NavigationStack {
+    OptionalBasicsView(
+      store: Store(
+        initialState: OptionalBasics.State(
+          optionalCounter: Counter.State(
+            count: 42
           )
         )
+      ) {
+        OptionalBasics()
       }
-    }
+    )
   }
 }

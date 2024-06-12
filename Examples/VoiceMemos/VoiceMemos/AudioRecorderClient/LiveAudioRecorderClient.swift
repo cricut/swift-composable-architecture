@@ -1,9 +1,8 @@
 import AVFoundation
-import ComposableArchitecture
-import Foundation
+import Dependencies
 
-extension AudioRecorderClient {
-  static var live: Self {
+extension AudioRecorderClient: DependencyKey {
+  static var liveValue: Self {
     let audioRecorder = AudioRecorder()
     return Self(
       currentTime: { await audioRecorder.currentTime },
@@ -27,11 +26,7 @@ private actor AudioRecorder {
   }
 
   static func requestPermission() async -> Bool {
-    await withUnsafeContinuation { continuation in
-      AVAudioSession.sharedInstance().requestRecordPermission { granted in
-        continuation.resume(returning: granted)
-      }
-    }
+    await AVAudioApplication.requestRecordPermission()
   }
 
   func stop() {
@@ -70,7 +65,8 @@ private actor AudioRecorder {
           recorder.wrappedValue.stop()
         }
 
-        try AVAudioSession.sharedInstance().setCategory(.record, mode: .default)
+        try AVAudioSession.sharedInstance().setCategory(
+          .playAndRecord, mode: .default, options: .defaultToSpeaker)
         try AVAudioSession.sharedInstance().setActive(true)
         self.recorder?.record()
       } catch {
@@ -78,9 +74,10 @@ private actor AudioRecorder {
       }
     }
 
-    guard let action = try await stream.first(where: { @Sendable _ in true })
-    else { throw CancellationError() }
-    return action
+    for try await didFinish in stream {
+      return didFinish
+    }
+    throw CancellationError()
   }
 }
 

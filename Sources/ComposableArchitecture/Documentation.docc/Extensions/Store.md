@@ -2,25 +2,43 @@
 
 ## Topics
 
-### Creating a Store
+### Creating a store
 
-- ``init(initialState:reducer:environment:)``
+- ``init(initialState:reducer:withDependencies:)``
+- ``StoreOf``
 
-### Scoping Stores
+### Accessing state
 
-- ``scope(state:action:)``
-- ``scope(state:)``
-- ``stateless``
-- ``actionless``
+- ``state-1qxwl``
+- ``subscript(dynamicMember:)-655ef``
+- ``withState(_:)``
 
-### Combine Integration
+### Sending actions
+
+- ``send(_:)``
+- ``send(_:animation:)``
+- ``send(_:transaction:)``
+- ``StoreTask``
+
+### Scoping stores
+
+- ``scope(state:action:)-90255``
+- ``scope(state:action:)-36e72``
+- ``scope(state:action:)-1nelp``
+- ``case``
+
+### Scoping store bindings
+
+- ``SwiftUI/Binding``
+
+### Combine integration
 
 - ``StorePublisher``
 
-### UIKit Integration
+### UIKit integration
 
 - ``ifLet(then:else:)``
 
-### Deprecations
+### Deprecated interfaces
 
 - <doc:StoreDeprecations>

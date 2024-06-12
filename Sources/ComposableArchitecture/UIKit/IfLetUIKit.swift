@@ -16,11 +16,11 @@ extension Store {
   /// class ParentViewController: UIViewController {
   ///   let store: Store<ParentState, ParentAction>
   ///   var cancellables: Set<AnyCancellable> = []
-  ///   ...
+  ///   // ...
   ///   func viewDidLoad() {
-  ///     ...
-  ///     self.store
-  ///       .scope(state: \.optionalChild, action: ParentAction.child)
+  ///     // ...
+  ///     store
+  ///       .scope(state: \.optionalChild, action: \.child)
   ///       .ifLet(
   ///         then: { [weak self] childStore in
   ///           self?.navigationController?.pushViewController(
@@ -29,11 +29,11 @@ extension Store {
   ///           )
   ///         },
   ///         else: { [weak self] in
-  ///           guard let self = self else { return }
-  ///           self.navigationController?.popToViewController(self, animated: true)
+  ///           guard let self else { return }
+  ///           navigationController?.popToViewController(self, animated: true)
   ///         }
   ///       )
-  ///       .store(in: &self.cancellables)
+  ///       .store(in: &cancellables)
   ///   }
   /// }
   /// ```
@@ -46,18 +46,24 @@ extension Store {
   /// - Returns: A cancellable that maintains a subscription to updates whenever the store's state
   ///   goes from `nil` to non-`nil` and vice versa, so that the caller can react to these changes.
   public func ifLet<Wrapped>(
-    then unwrap: @escaping (Store<Wrapped, Action>) -> Void,
+    then unwrap: @escaping (_ store: Store<Wrapped, Action>) -> Void,
     else: @escaping () -> Void = {}
   ) -> Cancellable where State == Wrapped? {
-    return self.state
+    return self
+      .publisher
       .removeDuplicates(by: { ($0 != nil) == ($1 != nil) })
       .sink { state in
         if var state = state {
           unwrap(
-            self.scope {
-              state = $0 ?? state
-              return state
-            }
+            self.scope(
+              id: self.id(state: \.!, action: \.self),
+              state: ToState {
+                state = $0 ?? state
+                return state
+              },
+              action: { $0 },
+              isInvalid: { $0 == nil }
+            )
           )
         } else {
           `else`()

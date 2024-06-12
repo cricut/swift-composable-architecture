@@ -1,121 +1,122 @@
 import ComposableArchitecture
 import SwiftUI
 
-struct RecordingMemoFailed: Equatable, Error {}
+@Reducer
+struct RecordingMemo {
+  @ObservableState
+  struct State: Equatable, Sendable {
+    var date: Date
+    var duration: TimeInterval = 0
+    var mode: Mode = .recording
+    var url: URL
 
-struct RecordingMemoState: Equatable {
-  var date: Date
-  var duration: TimeInterval = 0
-  var mode: Mode = .recording
-  var url: URL
-
-  enum Mode {
-    case recording
-    case encoding
-  }
-}
-
-enum RecordingMemoAction: Equatable {
-  case audioRecorderDidFinish(TaskResult<Bool>)
-  case delegate(DelegateAction)
-  case finalRecordingTime(TimeInterval)
-  case task
-  case timerUpdated
-  case stopButtonTapped
-
-  enum DelegateAction: Equatable {
-    case didFinish(TaskResult<RecordingMemoState>)
-  }
-}
-
-struct RecordingMemoEnvironment {
-  var audioRecorder: AudioRecorderClient
-  var mainRunLoop: AnySchedulerOf<RunLoop>
-}
-
-let recordingMemoReducer = Reducer<
-  RecordingMemoState,
-  RecordingMemoAction,
-  RecordingMemoEnvironment
-> { state, action, environment in
-  switch action {
-  case .audioRecorderDidFinish(.success(true)):
-    return .task { [state] in .delegate(.didFinish(.success(state))) }
-
-  case .audioRecorderDidFinish(.success(false)):
-    return .task { .delegate(.didFinish(.failure(RecordingMemoFailed()))) }
-
-  case let .audioRecorderDidFinish(.failure(error)):
-    return .task { .delegate(.didFinish(.failure(error))) }
-
-  case .delegate:
-    return .none
-
-  case let .finalRecordingTime(duration):
-    state.duration = duration
-    return .none
-
-  case .stopButtonTapped:
-    state.mode = .encoding
-    return .run { send in
-      if let currentTime = await environment.audioRecorder.currentTime() {
-        await send(.finalRecordingTime(currentTime))
-      }
-      await environment.audioRecorder.stopRecording()
+    enum Mode {
+      case recording
+      case encoding
     }
+  }
 
-  case .task:
-    return .run { [url = state.url] send in
-      async let startRecording: Void = send(
-        .audioRecorderDidFinish(
-          TaskResult { try await environment.audioRecorder.startRecording(url) }
-        )
-      )
+  enum Action: Sendable {
+    case audioRecorderDidFinish(Result<Bool, Error>)
+    case delegate(Delegate)
+    case finalRecordingTime(TimeInterval)
+    case onTask
+    case timerUpdated
+    case stopButtonTapped
 
-      for await _ in environment.mainRunLoop.timer(interval: .seconds(1)) {
-        await send(.timerUpdated)
+    @CasePathable
+    enum Delegate: Sendable {
+      case didFinish(Result<State, Error>)
+    }
+  }
+
+  struct Failed: Equatable, Error {}
+
+  @Dependency(\.audioRecorder) var audioRecorder
+  @Dependency(\.continuousClock) var clock
+
+  var body: some Reducer<State, Action> {
+    Reduce { state, action in
+      switch action {
+      case .audioRecorderDidFinish(.success(true)):
+        return .send(.delegate(.didFinish(.success(state))))
+
+      case .audioRecorderDidFinish(.success(false)):
+        return .send(.delegate(.didFinish(.failure(Failed()))))
+
+      case let .audioRecorderDidFinish(.failure(error)):
+        return .send(.delegate(.didFinish(.failure(error))))
+
+      case .delegate:
+        return .none
+
+      case let .finalRecordingTime(duration):
+        state.duration = duration
+        return .none
+
+      case .stopButtonTapped:
+        state.mode = .encoding
+        return .run { send in
+          if let currentTime = await self.audioRecorder.currentTime() {
+            await send(.finalRecordingTime(currentTime))
+          }
+          await self.audioRecorder.stopRecording()
+        }
+
+      case .onTask:
+        return .run { [url = state.url] send in
+          async let startRecording: Void = send(
+            .audioRecorderDidFinish(
+              Result { try await self.audioRecorder.startRecording(url: url) }
+            )
+          )
+          for await _ in self.clock.timer(interval: .seconds(1)) {
+            await send(.timerUpdated)
+          }
+          await startRecording
+        }
+
+      case .timerUpdated:
+        state.duration += 1
+        return .none
       }
     }
-
-  case .timerUpdated:
-    state.duration += 1
-    return .none
   }
 }
 
 struct RecordingMemoView: View {
-  let store: Store<RecordingMemoState, RecordingMemoAction>
+  let store: StoreOf<RecordingMemo>
 
   var body: some View {
-    WithViewStore(self.store) { viewStore in
-      VStack(spacing: 12) {
-        Text("Recording")
-          .font(.title)
-          .colorMultiply(Color(Int(viewStore.duration).isMultiple(of: 2) ? .systemRed : .label))
-          .animation(.easeInOut(duration: 0.5), value: viewStore.duration)
+    VStack(spacing: 12) {
+      Text("Recording")
+        .font(.title)
+        .colorMultiply(Color(Int(store.duration).isMultiple(of: 2) ? .systemRed : .label))
+        .animation(.easeInOut(duration: 0.5), value: store.duration)
 
-        if let formattedDuration = dateComponentsFormatter.string(from: viewStore.duration) {
-          Text(formattedDuration)
-            .font(.body.monospacedDigit().bold())
-            .foregroundColor(.black)
-        }
-
-        ZStack {
-          Circle()
-            .foregroundColor(Color(.label))
-            .frame(width: 74, height: 74)
-
-          Button(action: { viewStore.send(.stopButtonTapped, animation: .default) }) {
-            RoundedRectangle(cornerRadius: 4)
-              .foregroundColor(Color(.systemRed))
-              .padding(17)
-          }
-          .frame(width: 70, height: 70)
-        }
+      if let formattedDuration = dateComponentsFormatter.string(from: store.duration) {
+        Text(formattedDuration)
+          .font(.body.monospacedDigit().bold())
+          .foregroundColor(.black)
       }
-      .task {
-        await viewStore.send(.task).finish()
+
+      ZStack {
+        Circle()
+          .foregroundColor(Color(.label))
+          .frame(width: 74, height: 74)
+
+        Button {
+          store.send(.stopButtonTapped, animation: .default)
+        } label: {
+          RoundedRectangle(cornerRadius: 4)
+            .foregroundColor(Color(.systemRed))
+            .padding(17)
+        }
+        .frame(width: 70, height: 70)
       }
+    }
+    .task {
+      await store.send(.onTask).finish()
     }
   }
 }

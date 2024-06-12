@@ -1,32 +1,6 @@
-import ComposableArchitecture
+import Dependencies
+import DependenciesMacros
 import Foundation
-import XCTestDynamicOverlay
-
-public struct LoginRequest: Sendable {
-  public var email: String
-  public var password: String
-
-  public init(
-    email: String,
-    password: String
-  ) {
-    self.email = email
-    self.password = password
-  }
-}
-
-public struct TwoFactorRequest {
-  public var code: String
-  public var token: String
-
-  public init(
-    code: String,
-    token: String
-  ) {
-    self.code = code
-    self.token = token
-  }
-}
 
 public struct AuthenticationResponse: Equatable, Sendable {
   public var token: String
@@ -58,24 +32,21 @@ public enum AuthenticationError: Equatable, LocalizedError, Sendable {
   }
 }
 
+@DependencyClient
 public struct AuthenticationClient: Sendable {
-  public var login: @Sendable (LoginRequest) async throws -> AuthenticationResponse
-  public var twoFactor: @Sendable (TwoFactorRequest) async throws -> AuthenticationResponse
-
-  public init(
-    login: @escaping @Sendable (LoginRequest) async throws -> AuthenticationResponse,
-    twoFactor: @escaping @Sendable (TwoFactorRequest) async throws -> AuthenticationResponse
-  ) {
-    self.login = login
-    self.twoFactor = twoFactor
-  }
+  public var login:
+    @Sendable (_ email: String, _ password: String) async throws -> AuthenticationResponse
+  public var twoFactor:
+    @Sendable (_ code: String, _ token: String) async throws -> AuthenticationResponse
 }
 
-#if DEBUG
-  extension AuthenticationClient {
-    public static let unimplemented = Self(
-      login: XCTUnimplemented("\(Self.self).login"),
-      twoFactor: XCTUnimplemented("\(Self.self).twoFactor")
-    )
+extension AuthenticationClient: TestDependencyKey {
+  public static let testValue = Self()
+}
+
+extension DependencyValues {
+  public var authenticationClient: AuthenticationClient {
+    get { self[AuthenticationClient.self] }
+    set { self[AuthenticationClient.self] = newValue }
   }
-#endif
+}

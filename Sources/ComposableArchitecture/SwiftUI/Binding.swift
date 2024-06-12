@@ -1,204 +1,95 @@
 import CustomDump
 import SwiftUI
 
-/// A property wrapper type that can designate properties of app state that can be directly
-/// bindable in SwiftUI views.
+/// A property wrapper type that can designate properties of app state that can be directly bindable
+/// in SwiftUI views.
 ///
 /// Along with an action type that conforms to the ``BindableAction`` protocol, this type can be
 /// used to safely eliminate the boilerplate that is typically incurred when working with multiple
 /// mutable fields on state.
 ///
-/// For example, a settings screen may model its state with the following struct:
+/// > Note: It is not necessary to annotate _every_ field with `@BindingState`, and in fact it is
+/// > not recommended. Marking a field with the property wrapper makes it instantly mutable from the
+/// > outside, which may hurt the encapsulation of your feature. It is best to limit the usage of
+/// > the property wrapper to only those fields that need to have bindings derived for handing to
+/// > SwiftUI components.
 ///
-/// ```swift
-/// struct SettingsState {
-///   var digest = Digest.daily
-///   var displayName = ""
-///   var enableNotifications = false
-///   var isLoading = false
-///   var protectMyPosts = false
-///   var sendEmailNotifications = false
-///   var sendMobileNotifications = false
-/// }
-/// ```
-///
-/// The majority of these fields should be editable by the view, and in the Composable
-/// Architecture this means that each field requires a corresponding action that can be sent to
-/// the store. Typically this comes in the form of an enum with a case per field:
-///
-/// ```swift
-/// enum SettingsAction {
-///   case digestChanged(Digest)
-///   case displayNameChanged(String)
-///   case enableNotificationsChanged(Bool)
-///   case protectMyPostsChanged(Bool)
-///   case sendEmailNotificationsChanged(Bool)
-///   case sendMobileNotificationsChanged(Bool)
-/// }
-/// ```
-///
-/// And we're not even done yet. In the reducer we must now handle each action, which simply
-/// replaces the state at each field with a new value:
-///
-/// ```swift
-/// let settingsReducer = Reducer<
-///   SettingsState, SettingsAction, SettingsEnvironment
-/// > { state, action, environment in
-///   switch action {
-///   case let digestChanged(digest):
-///     state.digest = digest
-///     return .none
-///
-///   case let displayNameChanged(displayName):
-///     state.displayName = displayName
-///     return .none
-///
-///   case let enableNotificationsChanged(isOn):
-///     state.enableNotifications = isOn
-///     return .none
-///
-///   case let protectMyPostsChanged(isOn):
-///     state.protectMyPosts = isOn
-///     return .none
-///
-///   case let sendEmailNotificationsChanged(isOn):
-///     state.sendEmailNotifications = isOn
-///     return .none
-///
-///   case let sendMobileNotificationsChanged(isOn):
-///     state.sendMobileNotifications = isOn
-///     return .none
-///   }
-/// }
-/// ```
-///
-/// This is a _lot_ of boilerplate for something that should be simple. Luckily, we can
-/// dramatically eliminate this boilerplate using `BindableState` and ``BindableAction``.
-///
-/// First, we can annotate each bindable value of state with the `@BindableState` property
-/// wrapper:
-///
-/// ```swift
-/// struct SettingsState {
-///   @BindableState var digest = Digest.daily
-///   @BindableState var displayName = ""
-///   @BindableState var enableNotifications = false
-///   var isLoading = false
-///   @BindableState var protectMyPosts = false
-///   @BindableState var sendEmailNotifications = false
-///   @BindableState var sendMobileNotifications = false
-/// }
-/// ```
-///
-/// Each annotated field is directly to bindable to SwiftUI controls, like pickers, toggles, and
-/// text fields. Notably, the `isLoading` property is _not_ annotated as being bindable, which
-/// prevents the view from mutating this value directly.
-///
-/// Next, we can conform the action type to ``BindableAction`` by collapsing all of the
-/// individual, field-mutating actions into a single case that holds a ``BindingAction`` generic
-/// over the reducer's `SettingsState`:
-///
-/// ```swift
-/// enum SettingsAction: BindableAction {
-///   case binding(BindingAction<SettingsState>)
-/// }
-/// ```
-///
-/// And then, we can simplify the settings reducer by allowing the `binding` method to handle
-/// these field mutations for us:
-///
-/// ```swift
-/// let settingsReducer = Reducer<
-///   SettingsState, SettingsAction, SettingsEnvironment
-/// > {
-///   switch action {
-///   case .binding:
-///     return .none
-///   }
-/// }
-/// .binding()
-/// ```
-///
-/// Binding actions are constructed and sent to the store by calling
-/// ``ViewStore/binding(_:file:fileID:line:)`` with a key path to the bindable state:
-///
-/// ```swift
-/// TextField("Display name", text: viewStore.binding(\.$displayName))
-/// ```
-///
-/// Should you need to layer additional functionality over these bindings, your reducer can
-/// pattern match the action for a given key path:
-///
-/// ```swift
-/// case .binding(\.$displayName):
-///   // Validate display name
-///
-/// case .binding(\.$enableNotifications):
-///   // Return an authorization request effect
-/// ```
-///
-/// Binding actions can also be tested in much the same way regular actions are tested. Rather
-/// than send a specific action describing how a binding changed, such as
-/// `.displayNameChanged("Blob")`, you will send a ``Reducer/binding(action:)`` action that
-/// describes which key path is being set to what value, such as `.set(\.$displayName, "Blob")`:
-///
-/// ```swift
-/// let store = TestStore(
-///   initialState: SettingsState(),
-///   reducer: settingsReducer,
-///   environment: SettingsEnvironment(...)
-/// )
-///
-/// store.send(.set(\.$displayName, "Blob")) {
-///   $0.displayName = "Blob"
-/// }
-/// store.send(.set(\.$protectMyPosts, true)) {
-///   $0.protectMyPosts = true
-/// )
-/// ```
-@dynamicMemberLookup
+/// Read <doc:Bindings> for more information.
+@available(
+  iOS,
+  deprecated: 9999,
+  message:
+    "Deriving bindings directly from stores using '@ObservableState'. See the following migration guide for more information: https://pointfreeco.github.io/swift-composable-architecture/main/documentation/composablearchitecture/migratingto1.7#BindingState"
+)
+@available(
+  macOS,
+  deprecated: 9999,
+  message:
+    "Deriving bindings directly from stores using '@ObservableState'. See the following migration guide for more information: https://pointfreeco.github.io/swift-composable-architecture/main/documentation/composablearchitecture/migratingto1.7#BindingState"
+)
+@available(
+  tvOS,
+  deprecated: 9999,
+  message:
+    "Deriving bindings directly from stores using '@ObservableState'. See the following migration guide for more information: https://pointfreeco.github.io/swift-composable-architecture/main/documentation/composablearchitecture/migratingto1.7#BindingState"
+)
+@available(
+  watchOS,
+  deprecated: 9999,
+  message:
+    "Deriving bindings directly from stores using '@ObservableState'. See the following migration guide for more information: https://pointfreeco.github.io/swift-composable-architecture/main/documentation/composablearchitecture/migratingto1.7#BindingState"
+)
 @propertyWrapper
-public struct BindableState<Value> {
-  /// The underlying value wrapped by the bindable state.
+public struct BindingState<Value> {
+  /// The underlying value wrapped by the binding state.
   public var wrappedValue: Value
+  #if DEBUG
+    let fileID: StaticString
+    let line: UInt
+  #endif
 
   /// Creates bindable state from the value of another bindable state.
-  public init(wrappedValue: Value) {
+  public init(
+    wrappedValue: Value,
+    fileID: StaticString = #fileID,
+    line: UInt = #line
+  ) {
     self.wrappedValue = wrappedValue
+    #if DEBUG
+      self.fileID = fileID
+      self.line = line
+    #endif
   }
 
   /// A projection that can be used to derive bindings from a view store.
   ///
   /// Use the projected value to derive bindings from a view store with properties annotated with
-  /// `@BindableState`. To get the `projectedValue`, prefix the property with `$`:
+  /// `@BindingState`. To get the `projectedValue`, prefix the property with `$`:
   ///
   /// ```swift
-  /// TextField("Display name", text: viewStore.binding(\.$displayName))
+  /// TextField("Display name", text: viewStore.$displayName)
   /// ```
   ///
-  /// See ``BindableState`` for more details.
+  /// See ``BindingState`` for more details.
   public var projectedValue: Self {
     get { self }
     set { self = newValue }
   }
+}
 
-  /// Returns bindable state to the resulting value of a given key path.
-  ///
-  /// - Parameter keyPath: A key path to a specific resulting value.
-  /// - Returns: A new bindable state.
-  public subscript<Subject>(
-    dynamicMember keyPath: WritableKeyPath<Value, Subject>
-  ) -> BindableState<Subject> {
-    get { .init(wrappedValue: self.wrappedValue[keyPath: keyPath]) }
-    set { self.wrappedValue[keyPath: keyPath] = newValue.wrappedValue }
+extension BindingState: Equatable where Value: Equatable {
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.wrappedValue == rhs.wrappedValue
   }
 }
 
-extension BindableState: Equatable where Value: Equatable {}
+extension BindingState: Hashable where Value: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    self.wrappedValue.hash(into: &hasher)
+  }
+}
 
-extension BindableState: Hashable where Value: Hashable {}
-
-extension BindableState: Decodable where Value: Decodable {
+extension BindingState: Decodable where Value: Decodable {
   public init(from decoder: Decoder) throws {
     do {
       let container = try decoder.singleValueContainer()
@@ -209,7 +100,7 @@ extension BindableState: Decodable where Value: Decodable {
   }
 }
 
-extension BindableState: Encodable where Value: Encodable {
+extension BindingState: Encodable where Value: Encodable {
   public func encode(to encoder: Encoder) throws {
     do {
       var container = encoder.singleValueContainer()
@@ -220,115 +111,115 @@ extension BindableState: Encodable where Value: Encodable {
   }
 }
 
-extension BindableState: CustomReflectable {
+extension BindingState: CustomReflectable {
   public var customMirror: Mirror {
     Mirror(reflecting: self.wrappedValue)
   }
 }
 
-extension BindableState: CustomDumpRepresentable {
+extension BindingState: CustomDumpRepresentable {
   public var customDumpValue: Any {
     self.wrappedValue
   }
 }
 
-extension BindableState: CustomDebugStringConvertible where Value: CustomDebugStringConvertible {
+extension BindingState: CustomDebugStringConvertible where Value: CustomDebugStringConvertible {
   public var debugDescription: String {
     self.wrappedValue.debugDescription
   }
 }
 
-/// An action type that exposes a `binding` case that holds a ``BindingAction``.
-///
-/// Used in conjunction with ``BindableState`` to safely eliminate the boilerplate typically
-/// associated with mutating multiple fields in state.
-///
-/// See the documentation for ``BindableState`` for more details.
-public protocol BindableAction {
-  /// The root state type that contains bindable fields.
-  associatedtype State
-
-  /// Embeds a binding action in this action type.
-  ///
-  /// - Returns: A binding action.
-  static func binding(_ action: BindingAction<State>) -> Self
-}
-
-extension BindableAction {
-  /// Constructs a binding action for the given key path and bindable value.
-  ///
-  /// Shorthand for `.binding(.set(\.$keyPath, value))`.
-  ///
-  /// - Returns: A binding action.
-  public static func set<Value: Equatable>(
-    _ keyPath: WritableKeyPath<State, BindableState<Value>>,
-    _ value: Value
-  ) -> Self {
-    self.binding(.set(keyPath, value))
-  }
-}
-
-extension ViewStore where Action: BindableAction, Action.State == State {
-  /// Returns a binding to the resulting bindable state of a given key path.
-  ///
-  /// - Parameter keyPath: A key path to a specific bindable state.
-  /// - Returns: A new binding.
-  public func binding<Value: Equatable>(
-    _ keyPath: WritableKeyPath<State, BindableState<Value>>,
-    file: StaticString = #file,
-    fileID: StaticString = #fileID,
-    line: UInt = #line
-  ) -> Binding<Value> {
-    self.binding(
-      get: { $0[keyPath: keyPath].wrappedValue },
-      send: { value in
-        #if DEBUG
-          let debugger = BindableActionViewStoreDebugger(
-            value: value, bindableActionType: Action.self, file: file, fileID: fileID, line: line
-          )
-          let set: (inout State) -> Void = {
-            $0[keyPath: keyPath].wrappedValue = value
-            debugger.wasCalled = true
-          }
-        #else
-          let set: (inout State) -> Void = { $0[keyPath: keyPath].wrappedValue = value }
-        #endif
-        return .binding(.init(keyPath: keyPath, set: set, value: value))
-      }
-    )
-  }
-}
+extension BindingState: Sendable where Value: Sendable {}
 
 /// An action that describes simple mutations to some root state at a writable key path.
 ///
-/// Used in conjunction with ``BindableState`` and ``BindableAction`` to safely eliminate the
+/// Used in conjunction with ``BindingState`` and ``BindableAction`` to safely eliminate the
 /// boilerplate typically associated with mutating multiple fields in state.
 ///
-/// See the documentation for ``BindableState`` for more details.
-public struct BindingAction<Root>: Equatable {
+/// Read <doc:Bindings> for more information.
+public struct BindingAction<Root>: CasePathable, Equatable, @unchecked Sendable {
   public let keyPath: PartialKeyPath<Root>
 
-  let set: (inout Root) -> Void
-  let value: Any
-  let valueIsEqualTo: (Any) -> Bool
+  @usableFromInline
+  let set: @Sendable (inout Root) -> Void
+  // NB: swift(<5.8) has an enum existential layout bug that can cause crashes when extracting
+  //     payloads. We can box the existential to work around the bug.
+  #if swift(<5.8)
+    private let _value: [AnySendable]
+    var value: AnySendable { self._value[0] }
+  #else
+    let value: AnySendable
+  #endif
+  let valueIsEqualTo: @Sendable (Any) -> Bool
+
+  init(
+    keyPath: PartialKeyPath<Root>,
+    set: @escaping @Sendable (inout Root) -> Void,
+    value: AnySendable,
+    valueIsEqualTo: @escaping @Sendable (Any) -> Bool
+  ) {
+    self.keyPath = keyPath
+    self.set = set
+    #if swift(<5.8)
+      self._value = [value]
+    #else
+      self.value = value
+    #endif
+    self.valueIsEqualTo = valueIsEqualTo
+  }
 
   public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.keyPath == rhs.keyPath && lhs.valueIsEqualTo(rhs.value)
+  }
+
+  public static var allCasePaths: AllCasePaths {
+    AllCasePaths()
+  }
+
+  @dynamicMemberLookup
+  public struct AllCasePaths {
+    #if canImport(Perception)
+      public subscript<Value: Equatable>(
+        dynamicMember keyPath: WritableKeyPath<Root, Value>
+      ) -> AnyCasePath<BindingAction, Value> where Root: ObservableState {
+        AnyCasePath(
+          embed: { .set(keyPath, $0) },
+          extract: { $0.keyPath == keyPath ? $0.value.base as? Value : nil }
+        )
+      }
+    #endif
+
+    public subscript<Value: Equatable>(
+      dynamicMember keyPath: WritableKeyPath<Root, BindingState<Value>>
+    ) -> AnyCasePath<BindingAction, Value> {
+      AnyCasePath(
+        embed: { .set(keyPath, $0) },
+        extract: { $0.keyPath == keyPath ? $0.value.base as? Value : nil }
+      )
+    }
+  }
+}
+
+struct AnySendable: @unchecked Sendable {
+  let base: Any
+  @inlinable
+  init<Base: Sendable>(_ base: Base) {
+    self.base = base
   }
 }
 
 extension BindingAction {
   /// Returns an action that describes simple mutations to some root state at a writable key path
-  /// to bindable state.
+  /// to binding state.
   ///
   /// - Parameters:
   ///   - keyPath: A key path to the property that should be mutated. This property must be
-  ///     annotated with the ``BindableState`` property wrapper.
+  ///     annotated with the ``BindingState`` property wrapper.
   ///   - value: A value to assign at the given key path.
   /// - Returns: An action that describes simple mutations to some root state at a writable key
   ///   path.
-  public static func set<Value: Equatable>(
-    _ keyPath: WritableKeyPath<Root, BindableState<Value>>,
+  public static func set<Value: Equatable & Sendable>(
+    _ keyPath: WritableKeyPath<Root, BindingState<Value>>,
     _ value: Value
   ) -> Self {
     return .init(
@@ -351,213 +242,516 @@ extension BindingAction {
   ///   // Return an authorization request effect
   /// ```
   public static func ~= <Value>(
-    keyPath: WritableKeyPath<Root, BindableState<Value>>,
+    keyPath: WritableKeyPath<Root, BindingState<Value>>,
     bindingAction: Self
   ) -> Bool {
     keyPath == bindingAction.keyPath
   }
 
-  init<Value: Equatable>(
-    keyPath: WritableKeyPath<Root, BindableState<Value>>,
-    set: @escaping (inout Root) -> Void,
+  init<Value: Equatable & Sendable>(
+    keyPath: WritableKeyPath<Root, BindingState<Value>>,
+    set: @escaping @Sendable (_ state: inout Root) -> Void,
     value: Value
   ) {
     self.init(
       keyPath: keyPath,
       set: set,
-      value: value,
-      valueIsEqualTo: { $0 as? Value == value }
+      value: AnySendable(value),
+      valueIsEqualTo: { ($0 as? AnySendable)?.base as? Value == value }
     )
   }
 }
 
-extension BindingAction {
-  /// Transforms a binding action over some root state to some other type of root state given a
-  /// key path.
-  ///
-  /// Useful in transforming binding actions on view state into binding actions on reducer state
-  /// when the domain contains ``BindableState`` and ``BindableAction``.
-  ///
-  /// For example, we can model an app that can bind an integer count to a stepper and make a
-  /// network request to fetch a fact about that integer with the following domain:
-  ///
-  /// ```swift
-  /// struct AppState: Equatable {
-  ///   @BindableState var count = 0
-  ///   var fact: String?
-  ///   ...
-  /// }
-  ///
-  /// enum AppAction: BindableAction {
-  ///   case binding(BindingAction<AppState>)
-  ///   case factButtonTapped
-  ///   case factResponse(String?)
-  ///   ...
-  /// }
-  ///
-  /// struct AppEnvironment {
-  ///   var numberFact: (Int) async throws -> String
-  ///   ...
-  /// }
-  ///
-  /// let appReducer = Reducer<AppState, AppAction, AppEnvironment> {
-  ///   ...
-  /// }
-  /// .binding()
-  ///
-  /// struct AppView: View {
-  ///   let store: Store
-  ///
-  ///   var view: some View {
-  ///     ...
-  ///   }
-  /// }
-  /// ```
-  ///
-  /// The view may want to limit the state and actions it has access to by introducing a
-  /// view-specific domain that contains only the state and actions the view needs. Not only will
-  /// this minimize the number of times a view's `body` is computed, it will prevent the view
-  /// from accessing state or sending actions outside its purview. We can define it with its own
-  /// bindable state and bindable action:
-  ///
-  /// ```swift
-  /// extension AppView {
-  ///   struct ViewState: Equatable {
-  ///     @BindableState var count: Int
-  ///     let fact: String?
-  ///     // no access to any other state on `AppState`, like child domains
-  ///   }
-  ///
-  ///   enum ViewAction: BindableAction {
-  ///     case binding(BindingAction<ViewState>)
-  ///     case factButtonTapped
-  ///     // no access to any other action on `AppAction`, like `factResponse`
-  ///   }
-  /// }
-  /// ```
-  ///
-  /// In order to transform a `BindingAction<ViewState>` sent from the view domain into a
-  /// `BindingAction<AppState>`, we need a writable key path from `AppState` to `ViewState`. We
-  /// can synthesize one by defining a computed property on `AppState` with a getter and a setter.
-  /// The setter should communicate any mutations to bindable state back to the parent state:
-  ///
-  /// ```swift
-  /// extension AppState {
-  ///   var view: AppView.ViewState {
-  ///     get { .init(count: self.count, fact: self.fact) }
-  ///     set { self.count = newValue.count }
-  ///   }
-  /// }
-  /// ```
-  ///
-  /// With this property defined it is now possible to transform a `BindingAction<ViewState>` into
-  /// a `BindingAction<AppState>`, which means we can transform a `ViewAction` into an
-  /// `AppAction`. This is where `pullback` comes into play: we can unwrap the view action's
-  /// binding action on view state and transform it with `pullback` to work with app state. We can
-  /// define a helper that performs this transformation, as well as route any other view actions
-  /// to their reducer equivalents:
-  ///
-  /// ```swift
-  /// extension AppAction {
-  ///   static func view(_ viewAction: AppView.ViewAction) -> Self {
-  ///     switch viewAction {
-  ///     case let .binding(action):
-  ///       // transform view binding actions into app binding actions
-  ///       return .binding(action.pullback(\.view))
-  ///
-  ///     case let .factButtonTapped
-  ///       // route `ViewAction.factButtonTapped` to `AppAction.factButtonTapped`
-  ///       return .factButtonTapped
-  ///     }
-  ///   }
-  /// }
-  /// ```
-  ///
-  /// Finally, in the view we can invoke ``Store/scope(state:action:)`` with these domain
-  /// transformations to leverage the view store's binding helpers:
-  ///
-  /// ```swift
-  /// WithViewStore(
-  ///   self.store.scope(state: \.view, action: AppAction.view)
-  /// ) { viewStore in
-  ///   Stepper("\(viewStore.count)", viewStore.binding(\.$count))
-  ///   Button("Get number fact") { viewStore.send(.factButtonTapped) }
-  ///   if let fact = viewStore.fact {
-  ///     Text(fact)
-  ///   }
-  /// }
-  /// ```
-  ///
-  /// - Parameter keyPath: A key path from a new type of root state to the original root state.
-  /// - Returns: A binding action over a new type of root state.
-  public func pullback<NewRoot>(
-    _ keyPath: WritableKeyPath<NewRoot, Root>
-  ) -> BindingAction<NewRoot> {
-    .init(
-      keyPath: (keyPath as AnyKeyPath).appending(path: self.keyPath) as! PartialKeyPath<NewRoot>,
-      set: { self.set(&$0[keyPath: keyPath]) },
-      value: self.value,
-      valueIsEqualTo: self.valueIsEqualTo
-    )
+extension BindingAction: CustomDumpStringConvertible {
+  public var customDumpDescription: String {
+    var description = ".set("
+    customDump(self.keyPath, to: &description, maxDepth: 0)
+    description.append(", ")
+    customDump(self.value.base, to: &description, maxDepth: 0)
+    description.append(")")
+    return description
   }
 }
 
-extension BindingAction: CustomDumpReflectable {
-  public var customDumpMirror: Mirror {
-    .init(
-      self,
-      children: [
-        "set": (self.keyPath, self.value)
-      ],
-      displayStyle: .enum
-    )
+/// An action type that exposes a `binding` case that holds a ``BindingAction``.
+///
+/// Used in conjunction with ``BindingState`` to safely eliminate the boilerplate typically
+/// associated with mutating multiple fields in state.
+///
+/// Read <doc:Bindings> for more information.
+public protocol BindableAction {
+  /// The root state type that contains bindable fields.
+  associatedtype State
+
+  /// Embeds a binding action in this action type.
+  ///
+  /// - Returns: A binding action.
+  static func binding(_ action: BindingAction<State>) -> Self
+
+  /// Extracts a binding action from this action type.
+  var binding: BindingAction<State>? { get }
+}
+
+extension BindableAction {
+  public var binding: BindingAction<State>? {
+    AnyCasePath(unsafe: Self.binding).extract(from: self)
   }
 }
 
-extension Reducer where Action: BindableAction, State == Action.State {
-  /// Returns a reducer that applies ``BindingAction`` mutations to `State` before running this
-  /// reducer's logic.
+extension BindableAction {
+  /// Constructs a binding action for the given key path and bindable value.
   ///
-  /// For example, a settings screen may gather its binding actions into a single
-  /// ``BindingAction`` case by conforming to ``BindableAction``:
+  /// Shorthand for `.binding(.set(\.$keyPath, value))`.
   ///
-  /// ```swift
-  /// enum SettingsAction: BindableAction {
-  ///   ...
-  ///   case binding(BindingAction<SettingsState>)
-  /// }
-  /// ```
-  ///
-  /// The reducer can then be enhanced to automatically handle these mutations for you by tacking
-  /// on the ``binding()`` method:
-  ///
-  /// ```swift
-  /// let settingsReducer = Reducer<SettingsState, SettingsAction, SettingsEnvironment> {
-  ///   ...
-  /// }
-  /// .binding()
-  /// ```
-  ///
-  /// - Returns: A reducer that applies ``BindingAction`` mutations to `State` before running this
-  ///   reducer's logic.
-  public func binding() -> Self {
-    Self { state, action, environment in
-      guard let bindingAction = (/Action.binding).extract(from: action)
-      else {
-        return self.run(&state, action, environment)
+  /// - Returns: A binding action.
+  public static func set<Value: Equatable>(
+    _ keyPath: WritableKeyPath<State, BindingState<Value>>,
+    _ value: Value
+  ) -> Self {
+    self.binding(.set(keyPath, value))
+  }
+}
+
+extension ViewStore where ViewAction: BindableAction, ViewAction.State == ViewState {
+  @MainActor
+  public subscript<Value: Equatable>(
+    dynamicMember keyPath: WritableKeyPath<ViewState, BindingState<Value>>
+  ) -> Binding<Value> {
+    self.binding(
+      get: { $0[keyPath: keyPath].wrappedValue },
+      send: { value in
+        #if DEBUG
+          let bindingState = self.state[keyPath: keyPath]
+          let debugger = BindableActionViewStoreDebugger(
+            value: value,
+            bindableActionType: ViewAction.self,
+            context: .bindingState,
+            isInvalidated: self.store._isInvalidated,
+            fileID: bindingState.fileID,
+            line: bindingState.line
+          )
+          let set: @Sendable (inout ViewState) -> Void = {
+            $0[keyPath: keyPath].wrappedValue = value
+            debugger.wasCalled = true
+          }
+        #else
+          let set: @Sendable (inout ViewState) -> Void = {
+            $0[keyPath: keyPath].wrappedValue = value
+          }
+        #endif
+        return .binding(.init(keyPath: keyPath, set: set, value: value))
       }
+    )
+  }
+}
 
-      bindingAction.set(&state)
-      return self.run(&state, action, environment)
-    }
+/// A property wrapper type that can designate properties of view state that can be directly
+/// bindable in SwiftUI views.
+///
+/// Read <doc:Bindings> for more information.
+@dynamicMemberLookup
+@propertyWrapper
+public struct BindingViewState<Value> {
+  let binding: Binding<Value>
+  let initialValue: Value
+
+  init(binding: Binding<Value>) {
+    self.binding = binding
+    self.initialValue = binding.wrappedValue
+  }
+
+  public var wrappedValue: Value {
+    get { self.binding.wrappedValue }
+    set { self.binding.wrappedValue = newValue }
+  }
+
+  public var projectedValue: Binding<Value> {
+    self.binding
+  }
+
+  public subscript<Subject>(
+    dynamicMember keyPath: WritableKeyPath<Value, Subject>
+  ) -> BindingViewState<Subject> {
+    BindingViewState<Subject>(binding: self.binding[dynamicMember: keyPath])
+  }
+}
+
+extension BindingViewState: Equatable where Value: Equatable {
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.initialValue == rhs.initialValue && lhs.wrappedValue == rhs.wrappedValue
+  }
+}
+
+extension BindingViewState: Hashable where Value: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(self.initialValue)
+    hasher.combine(self.wrappedValue)
+  }
+}
+
+extension BindingViewState: CustomReflectable {
+  public var customMirror: Mirror {
+    Mirror(reflecting: self.wrappedValue)
+  }
+}
+
+extension BindingViewState: CustomDumpRepresentable {
+  public var customDumpValue: Any {
+    self.wrappedValue
+  }
+}
+
+extension BindingViewState: CustomDebugStringConvertible
+where Value: CustomDebugStringConvertible {
+  public var debugDescription: String {
+    self.wrappedValue.debugDescription
+  }
+}
+
+/// A property wrapper type that can derive ``BindingViewState`` values for a ``ViewStore``.
+///
+/// Read <doc:Bindings> for more information.
+@dynamicMemberLookup
+@propertyWrapper
+public struct BindingViewStore<State> {
+  let store: Store<State, BindingAction<State>>
+  #if DEBUG
+    let bindableActionType: Any.Type
+    let fileID: StaticString
+    let line: UInt
+  #endif
+
+  init<Action: BindableAction>(
+    store: Store<State, Action>,
+    fileID: StaticString = #fileID,
+    line: UInt = #line
+  ) where Action.State == State {
+    self.store = store.scope(
+      id: nil,
+      state: ToState(\.self),
+      action: Action.binding,
+      isInvalid: nil
+    )
+    #if DEBUG
+      self.bindableActionType = type(of: Action.self)
+      self.fileID = fileID
+      self.line = line
+    #endif
+  }
+
+  public init(projectedValue: Self) {
+    self = projectedValue
+  }
+
+  public var wrappedValue: State {
+    self.store.withState { $0 }
+  }
+
+  public var projectedValue: Self {
+    get { self }
+    set { self = newValue }
+  }
+
+  public subscript<Value>(dynamicMember keyPath: KeyPath<State, Value>) -> Value {
+    self.wrappedValue[keyPath: keyPath]
+  }
+
+  public subscript<Value: Equatable>(
+    dynamicMember keyPath: WritableKeyPath<State, BindingState<Value>>
+  ) -> BindingViewState<Value> {
+    BindingViewState(
+      binding: ViewStore(self.store, observe: { $0[keyPath: keyPath].wrappedValue })
+        .binding(
+          send: { value in
+            #if DEBUG
+              let debugger = BindableActionViewStoreDebugger(
+                value: value,
+                bindableActionType: self.bindableActionType,
+                context: .bindingStore,
+                isInvalidated: self.store._isInvalidated,
+                fileID: self.fileID,
+                line: self.line
+              )
+              let set: @Sendable (inout State) -> Void = {
+                $0[keyPath: keyPath].wrappedValue = value
+                debugger.wasCalled = true
+              }
+            #else
+              let set: @Sendable (inout State) -> Void = {
+                $0[keyPath: keyPath].wrappedValue = value
+              }
+            #endif
+            return .init(keyPath: keyPath, set: set, value: value)
+          }
+        )
+    )
+  }
+}
+
+extension ViewStore {
+  /// Initializes a structure that transforms a ``Store`` into an observable ``ViewStore`` in order
+  /// to compute bindings from state.
+  ///
+  /// Read <doc:Bindings> for more information.
+  ///
+  /// - Parameters:
+  ///   - store: A store.
+  ///   - toViewState: A function that transforms binding store state into observable view state.
+  ///     All changes to the view state will cause the `WithViewStore` to re-compute its view.
+  ///   - fromViewAction: A function that transforms view actions into store action.
+  ///   - isDuplicate: A function to determine when two `ViewState` values are equal. When values
+  ///     are equal, repeat view computations are removed.
+  public convenience init<State, Action>(
+    _ store: Store<State, Action>,
+    observe toViewState: @escaping (_ state: BindingViewStore<State>) -> ViewState,
+    send fromViewAction: @escaping (_ viewAction: ViewAction) -> Action,
+    removeDuplicates isDuplicate: @escaping (_ lhs: ViewState, _ rhs: ViewState) -> Bool
+  ) where ViewAction: BindableAction, ViewAction.State == State {
+    self.init(
+      store,
+      observe: { (_: State) in
+        toViewState(
+          BindingViewStore(
+            store: store.scope(
+              id: nil,
+              state: ToState(\.self),
+              action: fromViewAction,
+              isInvalid: nil
+            )
+          )
+        )
+      },
+      send: fromViewAction,
+      removeDuplicates: isDuplicate
+    )
+  }
+
+  /// Initializes a structure that transforms a ``Store`` into an observable ``ViewStore`` in order
+  /// to compute bindings from state.
+  ///
+  /// Read <doc:Bindings> for more information.
+  ///
+  /// - Parameters:
+  ///   - store: A store.
+  ///   - toViewState: A function that transforms binding store state into observable view state.
+  ///     All changes to the view state will cause the `WithViewStore` to re-compute its view.
+  ///   - isDuplicate: A function to determine when two `ViewState` values are equal. When values
+  ///     are equal, repeat view computations are removed.
+  @_disfavoredOverload
+  public convenience init<State>(
+    _ store: Store<State, ViewAction>,
+    observe toViewState: @escaping (_ state: BindingViewStore<State>) -> ViewState,
+    removeDuplicates isDuplicate: @escaping (_ lhs: ViewState, _ rhs: ViewState) -> Bool
+  ) where ViewAction: BindableAction, ViewAction.State == State {
+    self.init(
+      store,
+      observe: toViewState,
+      send: { $0 },
+      removeDuplicates: isDuplicate
+    )
+  }
+}
+
+extension ViewStore where ViewState: Equatable {
+  /// Initializes a structure that transforms a ``Store`` into an observable ``ViewStore`` in order
+  /// to compute bindings from state.
+  ///
+  /// Read <doc:Bindings> for more information.
+  ///
+  /// - Parameters:
+  ///   - store: A store.
+  ///   - toViewState: A function that transforms binding store state into observable view state.
+  ///     All changes to the view state will cause the `WithViewStore` to re-compute its view.
+  ///   - fromViewAction: A function that transforms view actions into store action.
+  @_disfavoredOverload
+  public convenience init<State, Action>(
+    _ store: Store<State, Action>,
+    observe toViewState: @escaping (_ state: BindingViewStore<State>) -> ViewState,
+    send fromViewAction: @escaping (_ viewAction: ViewAction) -> Action
+  ) where ViewAction: BindableAction, ViewAction.State == State {
+    self.init(
+      store,
+      observe: toViewState,
+      send: fromViewAction,
+      removeDuplicates: ==
+    )
+  }
+
+  /// Initializes a structure that transforms a ``Store`` into an observable ``ViewStore`` in order
+  /// to compute bindings from state.
+  ///
+  /// Read <doc:Bindings> for more information.
+  ///
+  /// - Parameters:
+  ///   - store: A store.
+  ///   - toViewState: A function that transforms binding store state into observable view state.
+  ///     All changes to the view state will cause the `WithViewStore` to re-compute its view.
+  ///   - content: A function that can generate content from a view store.
+  @_disfavoredOverload
+  public convenience init<State>(
+    _ store: Store<State, ViewAction>,
+    observe toViewState: @escaping (_ state: BindingViewStore<State>) -> ViewState
+  ) where ViewAction: BindableAction, ViewAction.State == State {
+    self.init(
+      store,
+      observe: toViewState,
+      removeDuplicates: ==
+    )
+  }
+}
+
+extension WithViewStore where Content: View {
+  /// Initializes a structure that transforms a ``Store`` into an observable ``ViewStore`` in order
+  /// to compute bindings and views from state.
+  ///
+  /// Read <doc:Bindings> for more information.
+  ///
+  /// - Parameters:
+  ///   - store: A store.
+  ///   - toViewState: A function that transforms binding store state into observable view state.
+  ///     All changes to the view state will cause the `WithViewStore` to re-compute its view.
+  ///   - fromViewAction: A function that transforms view actions into store action.
+  ///   - isDuplicate: A function to determine when two `ViewState` values are equal. When values
+  ///     are equal, repeat view computations are removed.
+  ///   - content: A function that can generate content from a view store.
+  @_disfavoredOverload
+  public init<State, Action>(
+    _ store: Store<State, Action>,
+    observe toViewState: @escaping (_ state: BindingViewStore<State>) -> ViewState,
+    send fromViewAction: @escaping (_ viewAction: ViewAction) -> Action,
+    removeDuplicates isDuplicate: @escaping (_ lhs: ViewState, _ rhs: ViewState) -> Bool,
+    @ViewBuilder content: @escaping (_ viewStore: ViewStore<ViewState, ViewAction>) -> Content,
+    file: StaticString = #fileID,
+    line: UInt = #line
+  ) where ViewAction: BindableAction, ViewAction.State == State {
+    self.init(
+      store,
+      observe: { (_: State) in
+        toViewState(
+          BindingViewStore(
+            store: store.scope(
+              id: nil,
+              state: ToState(\.self),
+              action: fromViewAction,
+              isInvalid: nil
+            )
+          )
+        )
+      },
+      send: fromViewAction,
+      removeDuplicates: isDuplicate,
+      content: content,
+      file: file,
+      line: line
+    )
+  }
+
+  /// Initializes a structure that transforms a ``Store`` into an observable ``ViewStore`` in order
+  /// to compute bindings and views from state.
+  ///
+  /// Read <doc:Bindings> for more information.
+  ///
+  /// - Parameters:
+  ///   - store: A store.
+  ///   - toViewState: A function that transforms binding store state into observable view state.
+  ///     All changes to the view state will cause the `WithViewStore` to re-compute its view.
+  ///   - isDuplicate: A function to determine when two `ViewState` values are equal. When values
+  ///     are equal, repeat view computations are removed.
+  ///   - content: A function that can generate content from a view store.
+  @_disfavoredOverload
+  public init<State>(
+    _ store: Store<State, ViewAction>,
+    observe toViewState: @escaping (_ state: BindingViewStore<State>) -> ViewState,
+    removeDuplicates isDuplicate: @escaping (_ lhs: ViewState, _ rhs: ViewState) -> Bool,
+    @ViewBuilder content: @escaping (_ viewStore: ViewStore<ViewState, ViewAction>) -> Content,
+    file: StaticString = #fileID,
+    line: UInt = #line
+  ) where ViewAction: BindableAction, ViewAction.State == State {
+    self.init(
+      store,
+      observe: toViewState,
+      send: { $0 },
+      removeDuplicates: isDuplicate,
+      content: content,
+      file: file,
+      line: line
+    )
+  }
+}
+
+extension WithViewStore where ViewState: Equatable, Content: View {
+  /// Initializes a structure that transforms a ``Store`` into an observable ``ViewStore`` in order
+  /// to compute bindings and views from state.
+  ///
+  /// Read <doc:Bindings> for more information.
+  ///
+  /// - Parameters:
+  ///   - store: A store.
+  ///   - toViewState: A function that transforms binding store state into observable view state.
+  ///     All changes to the view state will cause the `WithViewStore` to re-compute its view.
+  ///   - fromViewAction: A function that transforms view actions into store action.
+  ///   - content: A function that can generate content from a view store.
+  @_disfavoredOverload
+  public init<State, Action>(
+    _ store: Store<State, Action>,
+    observe toViewState: @escaping (_ state: BindingViewStore<State>) -> ViewState,
+    send fromViewAction: @escaping (_ viewAction: ViewAction) -> Action,
+    @ViewBuilder content: @escaping (_ viewStore: ViewStore<ViewState, ViewAction>) -> Content,
+    file: StaticString = #fileID,
+    line: UInt = #line
+  ) where ViewAction: BindableAction, ViewAction.State == State {
+    self.init(
+      store,
+      observe: toViewState,
+      send: fromViewAction,
+      removeDuplicates: ==,
+      content: content,
+      file: file,
+      line: line
+    )
+  }
+
+  /// Initializes a structure that transforms a ``Store`` into an observable ``ViewStore`` in order
+  /// to compute bindings and views from state.
+  ///
+  /// Read <doc:Bindings> for more information.
+  ///
+  /// - Parameters:
+  ///   - store: A store.
+  ///   - toViewState: A function that transforms binding store state into observable view state.
+  ///     All changes to the view state will cause the `WithViewStore` to re-compute its view.
+  ///   - content: A function that can generate content from a view store.
+  @_disfavoredOverload
+  public init<State>(
+    _ store: Store<State, ViewAction>,
+    observe toViewState: @escaping (_ state: BindingViewStore<State>) -> ViewState,
+    @ViewBuilder content: @escaping (_ viewStore: ViewStore<ViewState, ViewAction>) -> Content,
+    file: StaticString = #fileID,
+    line: UInt = #line
+  ) where ViewAction: BindableAction, ViewAction.State == State {
+    self.init(
+      store,
+      observe: toViewState,
+      removeDuplicates: ==,
+      content: content,
+      file: file,
+      line: line
+    )
   }
 }
 
 #if DEBUG
   private final class BindableActionViewStoreDebugger<Value> {
+    enum Context {
+      case bindingState
+      case bindingStore
+      case viewStore
+    }
+
     let value: Value
     let bindableActionType: Any.Type
-    let file: StaticString
+    let context: Context
+    let isInvalidated: () -> Bool
     let fileID: StaticString
     let line: UInt
     var wasCalled = false
@@ -565,35 +759,41 @@ extension Reducer where Action: BindableAction, State == Action.State {
     init(
       value: Value,
       bindableActionType: Any.Type,
-      file: StaticString,
+      context: Context,
+      isInvalidated: @escaping () -> Bool,
       fileID: StaticString,
       line: UInt
     ) {
       self.value = value
       self.bindableActionType = bindableActionType
-      self.file = file
+      self.context = context
+      self.isInvalidated = isInvalidated
       self.fileID = fileID
       self.line = line
     }
 
     deinit {
+      // NB: `isInvalidated()` can access store state, which must happen on the main thread.
+      let isInvalidated =
+        Thread.isMainThread
+        ? self.isInvalidated()
+        : DispatchQueue.main.sync(execute: self.isInvalidated)
+
+      guard !isInvalidated else { return }
       guard self.wasCalled else {
-        runtimeWarning(
+        var value = ""
+        customDump(self.value, to: &value, maxDepth: 0)
+        runtimeWarn(
           """
-          A binding action sent from a view store at "%@:%d" was not handled. …
+          A binding action sent from a store \
+          \(self.context == .bindingState ? "for binding state defined " : "")at \
+          "\(self.fileID):\(self.line)" was not handled. …
 
             Action:
-              %@
+              \(typeName(self.bindableActionType)).binding(.set(_, \(value)))
 
-          To fix this, invoke the "binding()" method on your feature's reducer.
-          """,
-          [
-            "\(self.fileID)",
-            self.line,
-            "\(self.bindableActionType).binding(.set(_, \(self.value)))",
-          ],
-          file: self.file,
-          line: self.line
+          To fix this, invoke "BindingReducer()" from your feature reducer's "body".
+          """
         )
         return
       }

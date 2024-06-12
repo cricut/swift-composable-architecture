@@ -2,40 +2,50 @@
 
 ## Topics
 
-### Creating a Reducer
+### Implementing a reducer
 
-- ``init(_:)``
-- ``empty``
+- ``State``
+- ``Action``
+- ``body-swift.property``
+- ``Reduce``
+- ``Effect``
 
-### Invoking Reducers
+### Composing reducers
 
-- ``run(_:_:_:)``
-- ``callAsFunction(_:_:_:)``
+- ``ReducerBuilder``
+- ``CombineReducers``
 
-### Composing Reducers
+### Embedding child features
 
-- ``combine(_:)-994ak``
-- ``combine(_:)-1ern2``
-- ``combined(with:)``
-- ``pullback(state:action:environment:)``
-- ``pullback(state:action:environment:file:fileID:line:)``
-- ``optional(file:fileID:line:)``
-- ``forEach(state:action:environment:file:fileID:line:)-n7qj``
-- ``forEach(state:action:environment:file:fileID:line:)-3m8jy``
-- ``Identified``
+- ``Scope``
+- ``ifLet(_:action:then:fileID:line:)-42kki``
+- ``ifCaseLet(_:action:then:fileID:line:)-3k4yb``
+- ``forEach(_:action:element:fileID:line:)-247po``
+- <doc:Navigation>
 
-### SwiftUI Integration
+### Sharing state
 
-- ``binding()``
+- <doc:SharingState>
+- ``Shared``
+- ``PersistenceKey``
 
-### Debugging Reducers
+### Supporting reducers
 
-- ``debug(_:state:action:actionFormat:environment:)``
-- ``debug(_:actionFormat:environment:)``
-- ``debugActions(_:actionFormat:environment:)``
+- ``EmptyReducer``
+- ``BindingReducer``
+- ``Swift/Optional``
+
+### Reducer modifiers
+
+- ``dependency(_:_:)``
+- ``transformDependency(_:transform:)``
+- ``onChange(of:_:)``
 - ``signpost(_:log:)``
-- ``ActionFormat``
-- ``DebugEnvironment``
+- ``_printChanges(_:)``
+
+### Supporting types
+
+- ``ReducerOf``
 
 ### Deprecations
 

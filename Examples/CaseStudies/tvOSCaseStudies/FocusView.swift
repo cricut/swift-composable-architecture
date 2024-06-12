@@ -10,80 +10,67 @@ private let readMe = """
   to reset its focus.
   """
 
-struct FocusState: Equatable {
-  var currentFocus = 1
-}
-
-enum FocusAction {
-  case randomButtonClicked
-}
-
-struct FocusEnvironment {
-  var randomElement: () -> Int = { (1..<11).randomElement()! }
-}
-
-let focusReducer = Reducer<FocusState, FocusAction, FocusEnvironment> {
-  state, action, environment in
-  switch action {
-  case .randomButtonClicked:
-    state.currentFocus = environment.randomElement()
-    return .none
+@Reducer
+struct Focus {
+  @ObservableState
+  struct State: Equatable {
+    var currentFocus = 1
   }
-}
 
-#if swift(>=5.3)
-  @available(tvOS 14.0, *)
-  struct FocusView: View {
-    let store: Store<FocusState, FocusAction>
+  enum Action {
+    case randomButtonClicked
+  }
 
-    @Environment(\.resetFocus) var resetFocus
-    @Namespace private var namespace
+  @Dependency(\.withRandomNumberGenerator) var withRandomNumberGenerator
 
-    var body: some View {
-      WithViewStore(self.store) { viewStore in
-        VStack(spacing: 100) {
-          Text(readMe)
-            .font(.headline)
-            .multilineTextAlignment(.leading)
-            .padding()
-
-          HStack(spacing: 40) {
-            ForEach(1..<6) { index in
-              Button(numbers[index]) {}
-                .prefersDefaultFocus(viewStore.currentFocus == index, in: self.namespace)
-            }
-          }
-          HStack(spacing: 40) {
-            ForEach(6..<11) { index in
-              Button(numbers[index]) {}
-                .prefersDefaultFocus(viewStore.currentFocus == index, in: self.namespace)
-            }
-          }
-
-          Button("Focus Random") { viewStore.send(.randomButtonClicked) }
+  var body: some Reducer<State, Action> {
+    Reduce { state, action in
+      switch action {
+      case .randomButtonClicked:
+        state.currentFocus = self.withRandomNumberGenerator {
+          (1..<11).randomElement(using: &$0)!
         }
-        .onChange(of: viewStore.currentFocus) { _ in
-          // Update the view's focus when the state tells us the focus changed.
-          self.resetFocus(in: self.namespace)
-        }
-        .focusScope(self.namespace)
+        return .none
       }
     }
   }
+}
 
-  @available(tvOS 14.0, *)
-  struct FocusView_Previews: PreviewProvider {
-    static var previews: some View {
-      FocusView(
-        store: Store(
-          initialState: FocusState(),
-          reducer: focusReducer,
-          environment: FocusEnvironment()
-        )
-      )
+struct FocusView: View {
+  let store: StoreOf<Focus>
+
+  @Environment(\.resetFocus) var resetFocus
+  @Namespace private var namespace
+
+  var body: some View {
+    VStack(spacing: 100) {
+      Text(readMe)
+        .font(.headline)
+        .multilineTextAlignment(.leading)
+        .padding()
+
+      HStack(spacing: 40) {
+        ForEach(1..<6) { index in
+          Button(numbers[index]) {}
+            .prefersDefaultFocus(store.currentFocus == index, in: namespace)
+        }
+      }
+      HStack(spacing: 40) {
+        ForEach(6..<11) { index in
+          Button(numbers[index]) {}
+            .prefersDefaultFocus(store.currentFocus == index, in: namespace)
+        }
+      }
+
+      Button("Focus Random") { store.send(.randomButtonClicked) }
     }
+    .onChange(of: store.currentFocus) {
+      // Update the view's focus when the state tells us the focus changed.
+      resetFocus(in: namespace)
+    }
+    .focusScope(namespace)
   }
-#endif
+}
 
 private let numbers = [
   "Zero",
@@ -98,3 +85,11 @@ private let numbers = [
   "Nine",
   "Ten",
 ]
+
+#Preview {
+  FocusView(
+    store: Store(initialState: Focus.State()) {
+      Focus()
+    }
+  )
+}

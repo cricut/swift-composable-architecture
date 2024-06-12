@@ -1,66 +1,49 @@
 import ComposableArchitecture
 import GameCore
 
-public struct NewGameState: Equatable {
-  public var game: GameState?
-  public var oPlayerName = ""
-  public var xPlayerName = ""
+@Reducer
+public struct NewGame {
+  @ObservableState
+  public struct State: Equatable {
+    @Presents public var game: Game.State?
+    public var oPlayerName = ""
+    public var xPlayerName = ""
+
+    public init() {}
+  }
+
+  public enum Action: BindableAction {
+    case binding(BindingAction<State>)
+    case game(PresentationAction<Game.Action>)
+    case letsPlayButtonTapped
+    case logoutButtonTapped
+  }
 
   public init() {}
-}
 
-public enum NewGameAction: Equatable {
-  case game(GameAction)
-  case gameDismissed
-  case letsPlayButtonTapped
-  case logoutButtonTapped
-  case oPlayerNameChanged(String)
-  case xPlayerNameChanged(String)
-}
+  public var body: some Reducer<State, Action> {
+    BindingReducer()
+    Reduce { state, action in
+      switch action {
+      case .binding:
+        return .none
 
-public struct NewGameEnvironment {
-  public init() {}
-}
+      case .game:
+        return .none
 
-public let newGameReducer = Reducer<NewGameState, NewGameAction, NewGameEnvironment>.combine(
-  gameReducer
-    .optional()
-    .pullback(
-      state: \.game,
-      action: /NewGameAction.game,
-      environment: { _ in GameEnvironment() }
-    ),
+      case .letsPlayButtonTapped:
+        state.game = Game.State(
+          oPlayerName: state.oPlayerName,
+          xPlayerName: state.xPlayerName
+        )
+        return .none
 
-  .init { state, action, _ in
-    switch action {
-    case .game(.quitButtonTapped):
-      state.game = nil
-      return .none
-
-    case .gameDismissed:
-      state.game = nil
-      return .none
-
-    case .game:
-      return .none
-
-    case .letsPlayButtonTapped:
-      state.game = GameState(
-        oPlayerName: state.oPlayerName,
-        xPlayerName: state.xPlayerName
-      )
-      return .none
-
-    case .logoutButtonTapped:
-      return .none
-
-    case let .oPlayerNameChanged(name):
-      state.oPlayerName = name
-      return .none
-
-    case let .xPlayerNameChanged(name):
-      state.xPlayerName = name
-      return .none
+      case .logoutButtonTapped:
+        return .none
+      }
+    }
+    .ifLet(\.$game, action: \.game) {
+      Game()
     }
   }
-)
+}

@@ -1,11 +1,11 @@
-// swift-tools-version:5.3
+// swift-tools-version:5.9
 
 import PackageDescription
 
 let package = Package(
   name: "tic-tac-toe",
   platforms: [
-    .iOS(.v14)
+    .iOS(.v17)
   ],
   products: [
     .library(name: "AppCore", targets: ["AppCore"]),
@@ -27,7 +27,8 @@ let package = Package(
     .library(name: "TwoFactorUIKit", targets: ["TwoFactorUIKit"]),
   ],
   dependencies: [
-    .package(name: "swift-composable-architecture", path: "../../..")
+    .package(name: "swift-composable-architecture", path: "../../.."),
+    .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.0.0"),
   ],
   targets: [
     .target(
@@ -63,7 +64,8 @@ let package = Package(
     .target(
       name: "AuthenticationClient",
       dependencies: [
-        .product(name: "ComposableArchitecture", package: "swift-composable-architecture")
+        .product(name: "Dependencies", package: "swift-dependencies"),
+        .product(name: "DependenciesMacros", package: "swift-dependencies"),
       ]
     ),
     .target(
@@ -84,10 +86,6 @@ let package = Package(
     .target(
       name: "GameSwiftUI",
       dependencies: ["GameCore"]
-    ),
-    .testTarget(
-      name: "GameSwiftUITests",
-      dependencies: ["GameSwiftUI"]
     ),
     .target(
       name: "GameUIKit",
@@ -112,10 +110,6 @@ let package = Package(
         "LoginCore",
         "TwoFactorSwiftUI",
       ]
-    ),
-    .testTarget(
-      name: "LoginSwiftUITests",
-      dependencies: ["LoginSwiftUI"]
     ),
     .target(
       name: "LoginUIKit",
@@ -143,10 +137,6 @@ let package = Package(
         "NewGameCore",
       ]
     ),
-    .testTarget(
-      name: "NewGameSwiftUITests",
-      dependencies: ["NewGameSwiftUI"]
-    ),
     .target(
       name: "NewGameUIKit",
       dependencies: [
@@ -169,10 +159,6 @@ let package = Package(
     .target(
       name: "TwoFactorSwiftUI",
       dependencies: ["TwoFactorCore"]
-    ),
-    .testTarget(
-      name: "TwoFactorSwiftUITests",
-      dependencies: ["TwoFactorSwiftUI"]
     ),
     .target(
       name: "TwoFactorUIKit",

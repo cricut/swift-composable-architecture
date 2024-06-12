@@ -1,37 +1,38 @@
-import Combine
 import ComposableArchitecture
-import SwiftUI
 import UIKit
 
-struct CounterState: Equatable, Identifiable {
-  let id = UUID()
-  var count = 0
-}
+@Reducer
+struct Counter {
+  @ObservableState
+  struct State: Equatable, Identifiable {
+    let id = UUID()
+    var count = 0
+  }
 
-enum CounterAction: Equatable {
-  case decrementButtonTapped
-  case incrementButtonTapped
-}
+  enum Action {
+    case decrementButtonTapped
+    case incrementButtonTapped
+  }
 
-struct CounterEnvironment {}
-
-let counterReducer = Reducer<CounterState, CounterAction, CounterEnvironment> { state, action, _ in
-  switch action {
-  case .decrementButtonTapped:
-    state.count -= 1
-    return .none
-  case .incrementButtonTapped:
-    state.count += 1
-    return .none
+  var body: some Reducer<State, Action> {
+    Reduce { state, action in
+      switch action {
+      case .decrementButtonTapped:
+        state.count -= 1
+        return .none
+      case .incrementButtonTapped:
+        state.count += 1
+        return .none
+      }
+    }
   }
 }
 
 final class CounterViewController: UIViewController {
-  let viewStore: ViewStore<CounterState, CounterAction>
-  private var cancellables: Set<AnyCancellable> = []
+  let store: StoreOf<Counter>
 
-  init(store: Store<CounterState, CounterAction>) {
-    self.viewStore = ViewStore(store)
+  init(store: StoreOf<Counter>) {
+    self.store = store
     super.init(nibName: nil, bundle: nil)
   }
 
@@ -42,7 +43,7 @@ final class CounterViewController: UIViewController {
   override func viewDidLoad() {
     super.viewDidLoad()
 
-    self.view.backgroundColor = .systemBackground
+    view.backgroundColor = .systemBackground
 
     let decrementButton = UIButton(type: .system)
     decrementButton.addTarget(self, action: #selector(decrementButtonTapped), for: .touchUpInside)
@@ -61,37 +62,32 @@ final class CounterViewController: UIViewController {
       incrementButton,
     ])
     rootStackView.translatesAutoresizingMaskIntoConstraints = false
-    self.view.addSubview(rootStackView)
+    view.addSubview(rootStackView)
 
     NSLayoutConstraint.activate([
-      rootStackView.centerXAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.centerXAnchor),
-      rootStackView.centerYAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.centerYAnchor),
+      rootStackView.centerXAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerXAnchor),
+      rootStackView.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor),
     ])
 
-    self.viewStore.publisher
-      .map { "\($0.count)" }
-      .assign(to: \.text, on: countLabel)
-      .store(in: &self.cancellables)
+    observe { [weak self] in
+      guard let self else { return }
+      countLabel.text = "\(store.count)"
+    }
   }
 
   @objc func decrementButtonTapped() {
-    self.viewStore.send(.decrementButtonTapped)
+    store.send(.decrementButtonTapped)
   }
 
   @objc func incrementButtonTapped() {
-    self.viewStore.send(.incrementButtonTapped)
+    store.send(.incrementButtonTapped)
   }
 }
 
-struct CounterViewController_Previews: PreviewProvider {
-  static var previews: some View {
-    let vc = CounterViewController(
-      store: Store(
-        initialState: CounterState(),
-        reducer: counterReducer,
-        environment: CounterEnvironment()
-      )
-    )
-    return UIViewRepresented(makeUIView: { _ in vc.view })
-  }
+#Preview {
+  CounterViewController(
+    store: Store(initialState: Counter.State()) {
+      Counter()
+    }
+  )
 }

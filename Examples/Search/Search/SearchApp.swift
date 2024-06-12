@@ -6,13 +6,10 @@ struct SearchApp: App {
   var body: some Scene {
     WindowGroup {
       SearchView(
-        store: Store(
-          initialState: SearchState(),
-          reducer: searchReducer.debug(),
-          environment: SearchEnvironment(
-            weatherClient: WeatherClient.live
-          )
-        )
+        store: Store(initialState: Search.State()) {
+          Search()
+            ._printChanges()
+        }
       )
     }
   }

@@ -1,138 +1,145 @@
 import ComposableArchitecture
-import Foundation
 import SwiftUI
 
-struct VoiceMemoState: Equatable, Identifiable {
-  var date: Date
-  var duration: TimeInterval
-  var mode = Mode.notPlaying
-  var title = ""
-  var url: URL
+@Reducer
+struct VoiceMemo {
+  @ObservableState
+  struct State: Equatable, Identifiable {
+    var date: Date
+    var duration: TimeInterval
+    var mode = Mode.notPlaying
+    var title = ""
+    var url: URL
 
-  var id: URL { self.url }
+    var id: URL { self.url }
 
-  enum Mode: Equatable {
-    case notPlaying
-    case playing(progress: Double)
-
-    var isPlaying: Bool {
-      if case .playing = self { return true }
-      return false
-    }
-
-    var progress: Double? {
-      if case let .playing(progress) = self { return progress }
-      return nil
+    @CasePathable
+    @dynamicMemberLookup
+    enum Mode: Equatable {
+      case notPlaying
+      case playing(progress: Double)
     }
   }
-}
 
-enum VoiceMemoAction: Equatable {
-  case audioPlayerClient(TaskResult<Bool>)
-  case delete
-  case playButtonTapped
-  case timerUpdated(TimeInterval)
-  case titleTextFieldChanged(String)
-}
+  enum Action {
+    case audioPlayerClient(Result<Bool, Error>)
+    case delegate(Delegate)
+    case playButtonTapped
+    case timerUpdated(TimeInterval)
+    case titleTextFieldChanged(String)
 
-struct VoiceMemoEnvironment {
-  var audioPlayer: AudioPlayerClient
-  var mainRunLoop: AnySchedulerOf<RunLoop>
-}
+    @CasePathable
+    enum Delegate {
+      case playbackStarted
+      case playbackFailed
+    }
+  }
 
-let voiceMemoReducer = Reducer<
-  VoiceMemoState,
-  VoiceMemoAction,
-  VoiceMemoEnvironment
-> { state, action, environment in
-  enum PlayID {}
+  @Dependency(\.audioPlayer) var audioPlayer
+  @Dependency(\.continuousClock) var clock
+  private enum CancelID { case play }
 
-  switch action {
-  case .audioPlayerClient:
-    state.mode = .notPlaying
-    return .cancel(id: PlayID.self)
-
-  case .delete:
-    return .cancel(id: PlayID.self)
-
-  case .playButtonTapped:
-    switch state.mode {
-    case .notPlaying:
-      state.mode = .playing(progress: 0)
-
-      return .run { [url = state.url] send in
-        let start = environment.mainRunLoop.now
-
-        async let playAudio: Void = send(
-          .audioPlayerClient(TaskResult { try await environment.audioPlayer.play(url) })
+  var body: some Reducer<State, Action> {
+    Reduce { state, action in
+      switch action {
+      case .audioPlayerClient(.failure):
+        state.mode = .notPlaying
+        return .merge(
+          .cancel(id: CancelID.play),
+          .send(.delegate(.playbackFailed))
         )
 
-        for try await tick in environment.mainRunLoop.timer(interval: 0.5) {
-          await send(.timerUpdated(tick.date.timeIntervalSince(start.date)))
+      case .audioPlayerClient:
+        state.mode = .notPlaying
+        return .cancel(id: CancelID.play)
+
+      case .delegate:
+        return .none
+
+      case .playButtonTapped:
+        switch state.mode {
+        case .notPlaying:
+          state.mode = .playing(progress: 0)
+
+          return .run { [url = state.url] send in
+            await send(.delegate(.playbackStarted))
+
+            async let playAudio: Void = send(
+              .audioPlayerClient(Result { try await self.audioPlayer.play(url: url) })
+            )
+
+            var start: TimeInterval = 0
+            for await _ in self.clock.timer(interval: .milliseconds(500)) {
+              start += 0.5
+              await send(.timerUpdated(start))
+            }
+
+            await playAudio
+          }
+          .cancellable(id: CancelID.play, cancelInFlight: true)
+
+        case .playing:
+          state.mode = .notPlaying
+          return .cancel(id: CancelID.play)
         }
+
+      case let .timerUpdated(time):
+        switch state.mode {
+        case .notPlaying:
+          break
+        case .playing:
+          state.mode = .playing(progress: time / state.duration)
+        }
+        return .none
+
+      case let .titleTextFieldChanged(text):
+        state.title = text
+        return .none
       }
-      .cancellable(id: PlayID.self, cancelInFlight: true)
-
-    case .playing:
-      state.mode = .notPlaying
-      return .cancel(id: PlayID.self)
     }
-
-  case let .timerUpdated(time):
-    switch state.mode {
-    case .notPlaying:
-      break
-    case let .playing(progress: progress):
-      state.mode = .playing(progress: time / state.duration)
-    }
-    return .none
-
-  case let .titleTextFieldChanged(text):
-    state.title = text
-    return .none
   }
 }
 
 struct VoiceMemoView: View {
-  let store: Store<VoiceMemoState, VoiceMemoAction>
+  @Bindable var store: StoreOf<VoiceMemo>
 
   var body: some View {
-    WithViewStore(store) { viewStore in
-      let currentTime =
-        viewStore.mode.progress.map { $0 * viewStore.duration } ?? viewStore.duration
-      HStack {
-        TextField(
-          "Untitled, \(viewStore.date.formatted(date: .numeric, time: .shortened))",
-          text: viewStore.binding(get: \.title, send: { .titleTextFieldChanged($0) })
-        )
-
-        Spacer()
-
-        dateComponentsFormatter.string(from: currentTime).map {
-          Text($0)
-            .font(.footnote.monospacedDigit())
-            .foregroundColor(Color(.systemGray))
-        }
-
-        Button(action: { viewStore.send(.playButtonTapped) }) {
-          Image(systemName: viewStore.mode.isPlaying ? "stop.circle" : "play.circle")
-            .font(.system(size: 22))
-        }
-      }
-      .buttonStyle(.borderless)
-      .frame(maxHeight: .infinity, alignment: .center)
-      .padding(.horizontal)
-      .listRowBackground(viewStore.mode.isPlaying ? Color(.systemGray6) : .clear)
-      .listRowInsets(EdgeInsets())
-      .background(
-        Color(.systemGray5)
-          .frame(maxWidth: viewStore.mode.isPlaying ? .infinity : 0)
-          .animation(
-            viewStore.mode.isPlaying ? .linear(duration: viewStore.duration) : nil,
-            value: viewStore.mode.isPlaying
-          ),
-        alignment: .leading
+    let currentTime =
+      store.mode.playing.map { $0 * store.duration } ?? store.duration
+    HStack {
+      TextField(
+        "Untitled, \(store.date.formatted(date: .numeric, time: .shortened))",
+        text: $store.title.sending(\.titleTextFieldChanged)
       )
+
+      Spacer()
+
+      dateComponentsFormatter.string(from: currentTime).map {
+        Text($0)
+          .font(.footnote.monospacedDigit())
+          .foregroundColor(Color(.systemGray))
+      }
+
+      Button {
+        store.send(.playButtonTapped)
+      } label: {
+        Image(systemName: store.mode.is(\.playing) ? "stop.circle" : "play.circle")
+          .font(.system(size: 22))
+      }
     }
+    .buttonStyle(.borderless)
+    .frame(maxHeight: .infinity, alignment: .center)
+    .padding(.horizontal)
+    .listRowBackground(store.mode.is(\.playing) ? Color(.systemGray6) : .clear)
+    .listRowInsets(EdgeInsets())
+    .background(
+      Color(.systemGray5)
+        .frame(maxWidth: store.mode.is(\.playing) ? .infinity : 0)
+        .animation(
+          store.mode.is(\.playing) ? .linear(duration: store.duration) : nil,
+          value: store.mode.is(\.playing)
+        ),
+      alignment: .leading
+    )
   }
 }

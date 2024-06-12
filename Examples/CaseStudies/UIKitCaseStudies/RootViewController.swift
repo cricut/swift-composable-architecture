@@ -1,5 +1,4 @@
 import ComposableArchitecture
-import SwiftUI
 import UIKit
 
 struct CaseStudy {
@@ -12,55 +11,46 @@ struct CaseStudy {
   }
 }
 
+@MainActor
 let dataSource: [CaseStudy] = [
   CaseStudy(
     title: "Basics",
     viewController: CounterViewController(
-      store: Store(
-        initialState: CounterState(),
-        reducer: counterReducer,
-        environment: CounterEnvironment()
-      )
+      store: Store(initialState: Counter.State()) {
+        Counter()
+      }
     )
   ),
   CaseStudy(
     title: "Lists",
     viewController: CountersTableViewController(
       store: Store(
-        initialState: CounterListState(
+        initialState: CounterList.State(
           counters: [
-            CounterState(),
-            CounterState(),
-            CounterState(),
+            Counter.State(),
+            Counter.State(),
+            Counter.State(),
           ]
-        ),
-        reducer: counterListReducer,
-        environment: CounterListEnvironment()
-      )
+        )
+      ) {
+        CounterList()
+      }
     )
   ),
   CaseStudy(
     title: "Navigate and load",
     viewController: EagerNavigationViewController(
-      store: Store(
-        initialState: EagerNavigationState(),
-        reducer: eagerNavigationReducer,
-        environment: EagerNavigationEnvironment(
-          mainQueue: .main
-        )
-      )
+      store: Store(initialState: EagerNavigation.State()) {
+        EagerNavigation()
+      }
     )
   ),
   CaseStudy(
     title: "Load then navigate",
     viewController: LazyNavigationViewController(
-      store: Store(
-        initialState: LazyNavigationState(),
-        reducer: lazyNavigationReducer,
-        environment: LazyNavigationEnvironment(
-          mainQueue: .main
-        )
-      )
+      store: Store(initialState: LazyNavigation.State()) {
+        LazyNavigation()
+      }
     )
   ),
 ]
@@ -69,8 +59,8 @@ final class RootViewController: UITableViewController {
   override func viewDidLoad() {
     super.viewDidLoad()
 
-    self.title = "Case Studies"
-    self.navigationController?.navigationBar.prefersLargeTitles = true
+    title = "Case Studies"
+    navigationController?.navigationBar.prefersLargeTitles = true
   }
 
   override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -89,13 +79,10 @@ final class RootViewController: UITableViewController {
 
   override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
     let caseStudy = dataSource[indexPath.row]
-    self.navigationController?.pushViewController(caseStudy.viewController(), animated: true)
+    navigationController?.pushViewController(caseStudy.viewController(), animated: true)
   }
 }
 
-struct RootViewController_Previews: PreviewProvider {
-  static var previews: some View {
-    let vc = UINavigationController(rootViewController: RootViewController())
-    return UIViewRepresented(makeUIView: { _ in vc.view })
-  }
+#Preview {
+  UINavigationController(rootViewController: RootViewController())
 }

@@ -23,10 +23,10 @@ let package = Package(
     .package(url: "https://github.com/pointfreeco/combine-schedulers", from: "1.0.0"),
     .package(url: "https://github.com/pointfreeco/swift-case-paths", from: "1.3.0"),
     .package(url: "https://github.com/pointfreeco/swift-concurrency-extras", from: "1.1.0"),
-    .package(url: "https://github.com/bdolewski-intellias/swift-custom-dump", exact: "1.3.2"),
-    .package(url: "https://github.com/bdolewski-intellias/swift-dependencies", exact: "1.3.5"),
+    .package(url: "https://github.com/bdolewski-intellias/swift-custom-dump", from: "1.3.2"),
+    .package(url: "https://github.com/bdolewski-intellias/swift-dependencies", from: "1.3.5"),
     .package(url: "https://github.com/pointfreeco/swift-identified-collections", from: "1.0.0"),
-    .package(url: "https://github.com/bdolewski-intellias/swiftui-navigation", exact: "1.5.3"),
+    .package(url: "https://github.com/bdolewski-intellias/swiftui-navigation", from: "1.5.3"),
     .package(url: "https://github.com/pointfreeco/swift-issue-reporting", exact: "1.1.2"),
   ],
   targets: [

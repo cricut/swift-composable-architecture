@@ -1,6 +1,6 @@
 import CustomDump
 import Dependencies
-import XCTestDynamicOverlay
+import IssueReporting
 
 #if canImport(Combine)
   import Combine
@@ -67,6 +67,7 @@ public struct Shared<Value> {
   }
 
   /// Perform an operation on shared state with isolated access to the underlying value.
+  @MainActor
   public func withLock<R>(_ transform: @Sendable (inout Value) throws -> R) rethrows -> R {
     try transform(&self._wrappedValue)
   }
@@ -137,7 +138,7 @@ public struct Shared<Value> {
     /// ```swift
     /// case .onAppear:
     ///   return .run { [currentUser = state.$currentUser] send in
-    ///     for await _ in currentUser {
+    ///     for await _ in currentUser.publisher.values {
     ///       await send(.currentUserUpdated)
     ///     }
     ///   }
@@ -172,6 +173,7 @@ public struct Shared<Value> {
     Shared<Member>(reference: self.reference, keyPath: self.keyPath.appending(path: keyPath)!)
   }
 
+  @_disfavoredOverload
   @available(
     *, deprecated, message: "Use 'Shared($value.optional)' to unwrap optional shared values"
   )
@@ -183,8 +185,10 @@ public struct Shared<Value> {
 
   public func assert(
     _ updateValueToExpectedResult: (inout Value) throws -> Void,
-    file: StaticString = #file,
-    line: UInt = #line
+    fileID: StaticString = #fileID,
+    file filePath: StaticString = #filePath,
+    line: UInt = #line,
+    column: UInt = #column
   ) rethrows where Value: Equatable {
     @Dependency(\.sharedChangeTrackers) var changeTrackers
     guard
@@ -192,18 +196,35 @@ public struct Shared<Value> {
         changeTrackers
         .first(where: { $0.changes[ObjectIdentifier(self.reference)] != nil })
     else {
-      XCTFail("Expected changes, but none occurred.", file: file, line: line)
+      reportIssue(
+        "Expected changes, but none occurred.",
+        fileID: fileID,
+        filePath: filePath,
+        line: line,
+        column: column
+      )
       return
     }
     try changeTracker.assert {
       guard var snapshot = self.snapshot, snapshot != self.currentValue else {
-        XCTFail("Expected changes, but none occurred.", file: file, line: line)
+        reportIssue(
+          "Expected changes, but none occurred.",
+          fileID: fileID,
+          filePath: filePath,
+          line: line,
+          column: column
+        )
         return
       }
       try updateValueToExpectedResult(&snapshot)
       self.snapshot = snapshot
       // TODO: Finesse error more than `XCTAssertNoDifference`
-      XCTAssertNoDifference(self.currentValue, self.snapshot, file: file, line: line)
+      XCTAssertNoDifference(
+        self.currentValue,
+        self.snapshot,
+        file: filePath,
+        line: line
+      )
       self.snapshot = nil
     }
   }
@@ -321,7 +342,7 @@ extension Shared: _CustomDiffObject {
 }
 
 extension Shared
-where Value: RandomAccessCollection & MutableCollection, Value.Index: Hashable & Sendable {
+where Value: _MutableIdentifiedCollection {
   /// Allows a `ForEach` view to transform a shared collection into shared elements.
   ///
   /// ```swift
@@ -347,8 +368,8 @@ where Value: RandomAccessCollection & MutableCollection, Value.Index: Hashable &
   /// > you need to derive a shared element from a shared collection, use a stable lookup, instead,
   /// > like the `$array[id:]` subscript on `IdentifiedArray`.
   public var elements: some RandomAccessCollection<Shared<Value.Element>> {
-    zip(self.wrappedValue.indices, self.wrappedValue).lazy.map { index, element in
-      self[index, default: DefaultSubscript(element)]
+    zip(self.wrappedValue.ids, self.wrappedValue).lazy.map { id, element in
+      self[id: id, default: DefaultSubscript(element)]
     }
   }
 }
@@ -433,6 +454,7 @@ extension Shared {
     SharedReader(reference: self.reference, keyPath: self.keyPath)
   }
 
+  @_disfavoredOverload
   @available(
     *, deprecated, message: "Use 'SharedReader($value.optional)' to unwrap optional shared values"
   )

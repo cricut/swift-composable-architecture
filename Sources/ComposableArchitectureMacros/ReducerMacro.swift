@@ -2,8 +2,11 @@ import SwiftDiagnostics
 import SwiftOperators
 import SwiftSyntax
 import SwiftSyntaxBuilder
-import SwiftSyntaxMacroExpansion
 import SwiftSyntaxMacros
+
+#if !canImport(SwiftSyntax600)
+  import SwiftSyntaxMacroExpansion
+#endif
 
 public enum ReducerMacro {
 }
@@ -93,7 +96,7 @@ extension ReducerMacro: MemberAttributeMacro {
           method.signature.parameterClause.parameters.count == 2,
           let state = method.signature.parameterClause.parameters.first,
           state.firstName.text == "into",
-          state.type.as(AttributedTypeSyntax.self)?.specifier?.text == "inout",
+          state.type.as(AttributedTypeSyntax.self)?.isInout == true,
           method.signature.parameterClause.parameters.last?.firstName.text == "action",
           method.signature.effectSpecifiers == nil,
           method.signature.returnClause?.type.as(IdentifierTypeSyntax.self) != nil
@@ -210,7 +213,7 @@ extension ReducerMacro: MemberMacro {
         method.signature.parameterClause.parameters.count == 2,
         let state = method.signature.parameterClause.parameters.first,
         state.firstName.text == "into",
-        state.type.as(AttributedTypeSyntax.self)?.specifier?.text == "inout",
+        state.type.as(AttributedTypeSyntax.self)?.isInout == true,
         method.signature.parameterClause.parameters.last?.firstName.text == "action",
         method.signature.effectSpecifiers == nil,
         method.signature.returnClause?.type.as(IdentifierTypeSyntax.self) != nil
@@ -495,7 +498,16 @@ private enum ReducerCase {
         let parameter = parameterClause.parameters.first,
         parameter.type.is(IdentifierTypeSyntax.self) || parameter.type.is(MemberTypeSyntax.self)
       {
-        return "case \(element.suffixed("Action").type.trimmedDescription)"
+        if let type = parameter.type.as(IdentifierTypeSyntax.self),
+          type.isEphemeral,
+          let generics = type.genericArgumentClause?.arguments,
+          generics.count == 1,
+          let generic = generics.first?.argument.trimmedDescription
+        {
+          return "case \(element.name)(\(generic))"
+        } else {
+          return "case \(element.suffixed("Action").type.trimmedDescription)"
+        }
       } else {
         return "case \(element.name)(Swift.Never)"
       }
@@ -641,7 +653,7 @@ private enum ReducerCase {
   }
 }
 
-extension Array where Element == ReducerCase {
+extension [ReducerCase] {
   init(members: MemberBlockItemListSyntax) {
     self = members.flatMap {
       if let enumCaseDecl = $0.decl.as(EnumCaseDeclSyntax.self) {
@@ -668,7 +680,7 @@ extension Array where Element == ReducerCase {
   }
 }
 
-extension Array where Element == String {
+extension [String] {
   var withCasePathsQualified: Self {
     self.flatMap { [$0, "CasePaths.\($0)"] }
   }

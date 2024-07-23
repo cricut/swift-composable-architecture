@@ -50,6 +50,8 @@ let package = Package(
         .product(name: "Perception", package: "swift-perception"),
         .product(name: "SwiftUINavigationCore", package: "swiftui-navigation"),
         .product(name: "XCTestDynamicOverlay", package: "xctest-dynamic-overlay"),
+        // this is just so SPM notice usage of swift clocks and actually pin it.
+        .product(name: "Clocks", package: "swift-clocks"),
       ]
     ),
     .testTarget(

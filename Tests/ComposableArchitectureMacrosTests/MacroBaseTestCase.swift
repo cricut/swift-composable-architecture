@@ -14,6 +14,7 @@
           ObservationStateTrackedMacro.self,
           ObservationStateIgnoredMacro.self,
           PresentsMacro.self,
+          IndirectsMacro.self,
           ViewActionMacro.self,
         ]
       ) {

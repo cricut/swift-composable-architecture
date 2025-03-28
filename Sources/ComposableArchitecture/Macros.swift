@@ -151,6 +151,15 @@ public macro ObservationStateIgnored() =
 public macro Presents() =
   #externalMacro(module: "ComposableArchitectureMacros", type: "PresentsMacro")
 
+/// Wraps a property with ``IndirectState`` and observes it.
+///
+/// Use this macro instead of ``IndirectState`` when you adopt the ``ObservableState()``
+/// macro, which is incompatible with property wrappers like ``IndirectState``.
+@attached(accessor, names: named(init), named(get), named(set))
+@attached(peer, names: prefixed(`$`), prefixed(_))
+public macro Indirects() =
+#externalMacro(module: "ComposableArchitectureMacros", type: "IndirectsMacro")
+
 /// Provides a view with access to a feature's ``ViewAction``s.
 ///
 /// If you want to restrict what actions can be sent from the view you can use this macro along with the

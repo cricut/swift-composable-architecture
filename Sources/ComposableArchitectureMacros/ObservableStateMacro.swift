@@ -49,6 +49,8 @@ public struct ObservableStateMacro {
   static let ignoredMacroName = "ObservationStateIgnored"
   static let presentsMacroName = "Presents"
   static let presentationStatePropertyWrapperName = "PresentationState"
+  static let indirectsMacroName = "Indirects"
+  static let indirectStatePropertyWrapperName = "IndirectState"
   static let sharedPropertyWrapperName = "Shared"
   static let sharedReaderPropertyWrapperName = "SharedReader"
 
@@ -448,8 +450,14 @@ extension ObservableStateMacro: MemberAttributeMacro {
       renamed: ObservableStateMacro.presentsMacroName,
       context: context
     )
+    property.diagnose(
+      attribute: "IndirectState",
+      renamed: ObservableStateMacro.indirectsMacroName,
+      context: context
+    )
 
     if property.hasMacroApplication(ObservableStateMacro.presentsMacroName)
+      || property.hasMacroApplication(ObservableStateMacro.indirectsMacroName)
       || property.hasMacroApplication(ObservableStateMacro.sharedPropertyWrapperName)
       || property.hasMacroApplication(ObservableStateMacro.sharedReaderPropertyWrapperName)
     {
@@ -543,6 +551,8 @@ public struct ObservationStateTrackedMacro: AccessorMacro {
     if property.hasMacroApplication(ObservableStateMacro.ignoredMacroName)
       || property.hasMacroApplication(ObservableStateMacro.presentationStatePropertyWrapperName)
       || property.hasMacroApplication(ObservableStateMacro.presentsMacroName)
+      || property.hasMacroApplication(ObservableStateMacro.indirectStatePropertyWrapperName)
+      || property.hasMacroApplication(ObservableStateMacro.indirectsMacroName)
       || property.hasMacroApplication(ObservableStateMacro.sharedPropertyWrapperName)
     {
       return []
@@ -602,6 +612,8 @@ extension ObservationStateTrackedMacro: PeerMacro {
     if property.hasMacroApplication(ObservableStateMacro.ignoredMacroName)
       || property.hasMacroApplication(ObservableStateMacro.presentationStatePropertyWrapperName)
       || property.hasMacroApplication(ObservableStateMacro.presentsMacroName)
+      || property.hasMacroApplication(ObservableStateMacro.indirectStatePropertyWrapperName)
+      || property.hasMacroApplication(ObservableStateMacro.indirectsMacroName)
       || property.hasMacroApplication(ObservableStateMacro.sharedPropertyWrapperName)
       || property.hasMacroApplication(ObservableStateMacro.trackedMacroName)
     {

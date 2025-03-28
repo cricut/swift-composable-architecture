@@ -1,11 +1,15 @@
 import ComposableArchitecture
-import XCTest
+import Foundation
+import Testing
 
 @testable import SyncUps
 
-final class SyncUpFormTests: XCTestCase {
-  @MainActor
-  func testAddAttendee() async {
+@MainActor
+struct SyncUpFormTests {
+  init() { uncheckedUseMainSerialExecutor = true }
+
+  @Test
+  func addAttendee() async {
     let store = TestStore(
       initialState: SyncUpForm.State(
         syncUp: SyncUp(
@@ -20,12 +24,9 @@ final class SyncUpFormTests: XCTestCase {
       $0.uuid = .incrementing
     }
 
-    XCTAssertNoDifference(
-      store.state.syncUp.attendees,
-      [
-        Attendee(id: Attendee.ID(UUID(0)))
-      ]
-    )
+    store.assert {
+      $0.syncUp.attendees = [Attendee(id: Attendee.ID(UUID(0)))]
+    }
 
     await store.send(.addAttendeeButtonTapped) {
       $0.focus = .attendee(Attendee.ID(UUID(1)))
@@ -36,8 +37,8 @@ final class SyncUpFormTests: XCTestCase {
     }
   }
 
-  @MainActor
-  func testFocus_RemoveAttendee() async {
+  @Test
+  func focusAfterRemovingAttendee() async {
     let store = TestStore(
       initialState: SyncUpForm.State(
         syncUp: SyncUp(

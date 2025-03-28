@@ -1,3 +1,5 @@
+import ComposableArchitecture
+
 @Reducer
 struct ContactsFeature {
   @ObservableState
@@ -10,7 +12,8 @@ struct ContactsFeature {
     case addButtonTapped
     case deleteButtonTapped(id: Contact.ID)
     case destination(PresentationAction<Destination.Action>)
-    case path(StackAction<ContactDetailFeature.State, ContactDetailFeature.Action>)
+    case path(StackActionOf<ContactDetailFeature>)
+    @CasePathable
     enum Alert: Equatable {
       case confirmDeletion(id: Contact.ID)
     }

@@ -1,11 +1,12 @@
 import AuthenticationClient
 import ComposableArchitecture
+import Testing
 import TwoFactorCore
-import XCTest
 
-final class TwoFactorCoreTests: XCTestCase {
-  @MainActor
-  func testFlow_Success() async {
+@MainActor
+struct TwoFactorCoreTests {
+  @Test
+  func happyPath() async {
     let store = TestStore(initialState: TwoFactor.State(token: "deadbeefdeadbeef")) {
       TwoFactor()
     } withDependencies: {
@@ -35,8 +36,8 @@ final class TwoFactorCoreTests: XCTestCase {
     }
   }
 
-  @MainActor
-  func testFlow_Failure() async {
+  @Test
+  func unhappyPath() async {
     let store = TestStore(initialState: TwoFactor.State(token: "deadbeefdeadbeef")) {
       TwoFactor()
     } withDependencies: {

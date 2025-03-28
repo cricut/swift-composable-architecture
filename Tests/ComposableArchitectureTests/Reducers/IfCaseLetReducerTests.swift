@@ -3,11 +3,10 @@ import XCTest
 
 @available(*, deprecated, message: "TODO: Update to use case pathable syntax with Swift 5.9")
 final class IfCaseLetReducerTests: BaseTCATestCase {
-  @MainActor
   func testChildAction() async {
     struct SomeError: Error, Equatable {}
 
-    let store = TestStore(initialState: Result.success(0)) {
+    let store = await TestStore(initialState: Result.success(0)) {
       Reduce<Result<Int, SomeError>, Result<Int, SomeError>> { state, action in
         .none
       }
@@ -31,11 +30,10 @@ final class IfCaseLetReducerTests: BaseTCATestCase {
     }
   }
 
-  @MainActor
   func testNilChild() async {
     struct SomeError: Error, Equatable {}
 
-    let store = TestStore(initialState: Result.failure(SomeError())) {
+    let store = await TestStore(initialState: Result.failure(SomeError())) {
       EmptyReducer<Result<Int, SomeError>, Result<Int, SomeError>>()
         .ifCaseLet(\.success, action: \.success) {}
     }
@@ -61,7 +59,7 @@ final class IfCaseLetReducerTests: BaseTCATestCase {
         before child state changes to another case, especially if it is a long-living effect.
 
         • This action was sent to the store while state was another case. Make sure that actions \
-        for this reducer can only be sent from a view store when state is set to the appropriate \
+        for this reducer can only be sent from a store when state is set to the appropriate \
         case. In SwiftUI applications, use "SwitchStore".
         """
     }
@@ -69,7 +67,6 @@ final class IfCaseLetReducerTests: BaseTCATestCase {
     await store.send(.success(1))
   }
 
-  @MainActor
   func testEffectCancellation_Siblings() async {
     if #available(iOS 16, macOS 13, tvOS 16, watchOS 9, *) {
       struct Child: Reducer {
@@ -132,7 +129,7 @@ final class IfCaseLetReducerTests: BaseTCATestCase {
         }
       }
       let clock = TestClock()
-      let store = TestStore(initialState: Parent.State.child1(Child.State())) {
+      let store = await TestStore(initialState: Parent.State.child1(Child.State())) {
         Parent()
       } withDependencies: {
         $0.continuousClock = clock
@@ -150,7 +147,6 @@ final class IfCaseLetReducerTests: BaseTCATestCase {
     }
   }
 
-  @MainActor
   func testIdentifiableChild() async {
     struct Feature: Reducer {
       enum State: Equatable {
@@ -202,7 +198,7 @@ final class IfCaseLetReducerTests: BaseTCATestCase {
     }
 
     let mainQueue = DispatchQueue.test
-    let store = TestStore(initialState: Feature.State.child(Child.State(id: 1))) {
+    let store = await TestStore(initialState: Feature.State.child(Child.State(id: 1))) {
       Feature()
     } withDependencies: {
       $0.mainQueue = mainQueue.eraseToAnyScheduler()

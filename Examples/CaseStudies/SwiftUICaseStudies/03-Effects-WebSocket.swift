@@ -29,7 +29,7 @@ struct WebSocket {
     case alert(PresentationAction<Alert>)
     case connectButtonTapped
     case messageToSendChanged(String)
-    case receivedSocketMessage(Result<WebSocketClient.Message, Error>)
+    case receivedSocketMessage(Result<WebSocketClient.Message, any Error>)
     case sendButtonTapped
     case sendResponse(didSucceed: Bool)
     case webSocket(WebSocketClient.Action)
@@ -227,7 +227,7 @@ struct WebSocketClient {
   var open: @Sendable (_ id: ID, _ url: URL, _ protocols: [String]) async -> AsyncStream<Action> = {
     _, _, _ in .finished
   }
-  var receive: @Sendable (_ id: ID) async throws -> AsyncStream<Result<Message, Error>>
+  var receive: @Sendable (_ id: ID) async throws -> AsyncStream<Result<Message, any Error>>
   var send: @Sendable (_ id: ID, _ message: URLSessionWebSocketTask.Message) async throws -> Void
   var sendPing: @Sendable (_ id: ID) async throws -> Void
 }
@@ -241,11 +241,11 @@ extension WebSocketClient: DependencyKey {
       sendPing: { try await WebSocketActor.shared.sendPing(id: $0) }
     )
 
-    final actor WebSocketActor: GlobalActor {
-      final class Delegate: NSObject, URLSessionWebSocketDelegate {
+    @globalActor final actor WebSocketActor {
+      private final class Delegate: NSObject, @unchecked Sendable, URLSessionWebSocketDelegate {
         var continuation: AsyncStream<Action>.Continuation?
 
-        func urlSession(
+        nonisolated func urlSession(
           _: URLSession,
           webSocketTask _: URLSessionWebSocketTask,
           didOpenWithProtocol protocol: String?
@@ -253,7 +253,7 @@ extension WebSocketClient: DependencyKey {
           self.continuation?.yield(.didOpen(protocol: `protocol`))
         }
 
-        func urlSession(
+        nonisolated func urlSession(
           _: URLSession,
           webSocketTask _: URLSessionWebSocketTask,
           didCloseWith closeCode: URLSessionWebSocketTask.CloseCode,
@@ -295,12 +295,17 @@ extension WebSocketClient: DependencyKey {
         try self.socket(id: id).cancel(with: closeCode, reason: reason)
       }
 
-      func receive(id: ID) throws -> AsyncStream<Result<Message, Error>> {
+      func receive(id: ID) throws -> AsyncStream<Result<Message, any Error>> {
         let socket = try self.socket(id: id)
         return AsyncStream { continuation in
           let task = Task {
             while !Task.isCancelled {
-              continuation.yield(await Result { try await Message(socket.receive()) })
+              do {
+                let socketMessage = try await Message(socket.receive())
+                continuation.yield(.success(socketMessage))
+              } catch {
+                continuation.yield(.failure(error))
+              }
             }
             continuation.finish()
           }

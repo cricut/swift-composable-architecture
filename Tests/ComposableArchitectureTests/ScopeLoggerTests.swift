@@ -3,6 +3,7 @@ import SwiftUI
 import XCTest
 
 class ScopeLoggerTests: XCTestCase {
+  @MainActor
   func testScoping() {
     #if DEBUG
       Logger.shared.isEnabled = true
@@ -17,7 +18,7 @@ class ScopeLoggerTests: XCTestCase {
       }
       let viewStore = ViewStore(store, observe: { $0 })
       let pathStore = store.scope(state: \.path, action: \.path)
-      let elementStore = pathStore.scope(state: \.[id:0]!, action: \.[id:0])
+      let elementStore = pathStore.scope(state: \.[id: 0]!, action: \.[id: 0])
       Logger.shared.clear()
       elementStore.send(.incrementButtonTapped)
       XCTAssertEqual(

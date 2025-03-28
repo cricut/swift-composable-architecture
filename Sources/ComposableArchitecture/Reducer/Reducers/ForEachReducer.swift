@@ -3,8 +3,8 @@ import OrderedCollections
 /// A wrapper type for actions that can be presented in a list.
 ///
 /// Use this type for modeling a feature's domain that needs to present child features using
-/// ``Reducer/forEach(_:action:element:fileID:line:)-8wpyp``.
-public enum IdentifiedAction<ID: Hashable, Action>: CasePathable {
+/// ``Reducer/forEach(_:action:element:fileID:filePath:line:column:)-6zye8``.
+public enum IdentifiedAction<ID: Hashable & Sendable, Action>: CasePathable {
   /// An action sent to the element at a given identifier.
   case element(id: ID, action: Action)
 
@@ -110,6 +110,10 @@ extension Reducer {
   ///     actions.
   ///   - element: A reducer that will be invoked with child actions against elements of child
   ///     state.
+  ///   - fileID: The fileID.
+  ///   - filePath: The filePath.
+  ///   - line: The line.
+  ///   - column: The column.
   /// - Returns: A reducer that combines the child reducer with the parent reducer.
   @inlinable
   @warn_unqualified_access
@@ -163,7 +167,10 @@ extension Reducer {
   @inlinable
   @warn_unqualified_access
   public func forEach<
-    ElementState, ElementAction, ID: Hashable, Element: Reducer<ElementState, ElementAction>
+    ElementState,
+    ElementAction,
+    ID: Hashable & Sendable,
+    Element: Reducer<ElementState, ElementAction>
   >(
     _ toElementsState: WritableKeyPath<State, IdentifiedArray<ID, ElementState>>,
     action toElementAction: AnyCasePath<Action, (ID, ElementAction)>,
@@ -190,7 +197,7 @@ extension Reducer {
 }
 
 public struct _ForEachReducer<
-  Parent: Reducer, ID: Hashable, Element: Reducer
+  Parent: Reducer, ID: Hashable & Sendable, Element: Reducer
 >: Reducer {
   @usableFromInline
   let parent: Parent
@@ -290,7 +297,7 @@ public struct _ForEachReducer<
         associated effect before an element is removed, especially if it is a long-living effect.
 
         • This action was sent to the store while its state contained no element at this ID. To \
-        fix this make sure that actions for this reducer can only be sent from a view store when \
+        fix this make sure that actions for this reducer can only be sent from a store when \
         its state contains an element at this id. In SwiftUI applications, use "ForEachStore".
         """,
         fileID: fileID,
@@ -305,7 +312,7 @@ public struct _ForEachReducer<
     return self.element
       .dependency(\.navigationIDPath, elementNavigationID)
       .reduce(into: &state[keyPath: self.toElementsState][id: id]!, action: elementAction)
-      .map { self.toElementAction.embed((id, $0)) }
+      .map { [toElementAction] in toElementAction.embed((id, $0)) }
       ._cancellable(id: navigationID, navigationIDPath: self.navigationIDPath)
   }
 }

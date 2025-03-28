@@ -17,8 +17,9 @@ private let readMe = """
   favorite state and rendering an alert.
   """
 
+@ObservableState
 struct FavoritingState<ID: Hashable & Sendable>: Equatable {
-  @PresentationState var alert: AlertState<FavoritingAction.Alert>?
+  @Presents var alert: AlertState<FavoritingAction.Alert>?
   let id: ID
   var isFavorite: Bool
 }
@@ -27,7 +28,7 @@ struct FavoritingState<ID: Hashable & Sendable>: Equatable {
 enum FavoritingAction {
   case alert(PresentationAction<Alert>)
   case buttonTapped
-  case response(Result<Bool, Error>)
+  case response(Result<Bool, any Error>)
 
   enum Alert: Equatable {}
 }
@@ -36,8 +37,8 @@ enum FavoritingAction {
 struct Favoriting<ID: Hashable & Sendable> {
   let favorite: @Sendable (ID, Bool) async throws -> Bool
 
-  private struct CancelID: Hashable {
-    let id: AnyHashable
+  private struct CancelID: Hashable, Sendable {
+    let id: AnyHashableSendable
   }
 
   var body: some Reducer<FavoritingState<ID>, FavoritingAction> {
@@ -54,7 +55,7 @@ struct Favoriting<ID: Hashable & Sendable> {
         return .run { [id = state.id, isFavorite = state.isFavorite, favorite] send in
           await send(.response(Result { try await favorite(id, isFavorite) }))
         }
-        .cancellable(id: CancelID(id: state.id), cancelInFlight: true)
+        .cancellable(id: CancelID(id: AnyHashableSendable(state.id)), cancelInFlight: true)
 
       case let .response(.failure(error)):
         state.alert = AlertState { TextState(error.localizedDescription) }
@@ -69,23 +70,22 @@ struct Favoriting<ID: Hashable & Sendable> {
 }
 
 struct FavoriteButton<ID: Hashable & Sendable>: View {
-  let store: Store<FavoritingState<ID>, FavoritingAction>
+  @Bindable var store: Store<FavoritingState<ID>, FavoritingAction>
 
   var body: some View {
-    WithViewStore(self.store, observe: { $0 }) { viewStore in
-      Button {
-        viewStore.send(.buttonTapped)
-      } label: {
-        Image(systemName: "heart")
-          .symbolVariant(viewStore.isFavorite ? .fill : .none)
-      }
-      .alert(store: self.store.scope(state: \.$alert, action: \.alert))
+    Button {
+      store.send(.buttonTapped)
+    } label: {
+      Image(systemName: "heart")
+        .symbolVariant(store.isFavorite ? .fill : .none)
     }
+    .alert($store.scope(state: \.alert, action: \.alert))
   }
 }
 
 @Reducer
 struct Episode {
+  @ObservableState
   struct State: Equatable, Identifiable {
     var alert: AlertState<FavoritingAction.Alert>?
     let id: UUID
@@ -115,20 +115,19 @@ struct EpisodeView: View {
   let store: StoreOf<Episode>
 
   var body: some View {
-    WithViewStore(self.store, observe: { $0 }) { viewStore in
-      HStack(alignment: .firstTextBaseline) {
-        Text(viewStore.title)
+    HStack(alignment: .firstTextBaseline) {
+      Text(store.title)
 
-        Spacer()
+      Spacer()
 
-        FavoriteButton(store: self.store.scope(state: \.favorite, action: \.favorite))
-      }
+      FavoriteButton(store: store.scope(state: \.favorite, action: \.favorite))
     }
   }
 }
 
 @Reducer
 struct Episodes {
+  @ObservableState
   struct State: Equatable {
     var episodes: IdentifiedArrayOf<Episode.State> = []
   }
@@ -157,7 +156,8 @@ struct EpisodesView: View {
       Section {
         AboutView(readMe: readMe)
       }
-      ForEachStore(self.store.scope(state: \.episodes, action: \.episodes)) { rowStore in
+
+      ForEach(store.scope(state: \.episodes, action: \.episodes)) { rowStore in
         EpisodeView(store: rowStore)
       }
       .buttonStyle(.borderless)

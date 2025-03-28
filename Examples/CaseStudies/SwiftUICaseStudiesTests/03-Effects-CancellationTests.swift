@@ -1,11 +1,12 @@
 import ComposableArchitecture
-import XCTest
+import Testing
 
 @testable import SwiftUICaseStudies
 
-final class EffectsCancellationTests: XCTestCase {
-  @MainActor
-  func testTrivia_SuccessfulRequest() async {
+@MainActor
+struct EffectsCancellationTests {
+  @Test
+  func successfulRequest() async {
     let store = TestStore(initialState: EffectsCancellation.State()) {
       EffectsCancellation()
     } withDependencies: {
@@ -27,8 +28,8 @@ final class EffectsCancellationTests: XCTestCase {
     }
   }
 
-  @MainActor
-  func testTrivia_FailedRequest() async {
+  @Test
+  func failedRequest() async {
     struct FactError: Equatable, Error {}
     let store = TestStore(initialState: EffectsCancellation.State()) {
       EffectsCancellation()
@@ -50,8 +51,8 @@ final class EffectsCancellationTests: XCTestCase {
   // in the `.cancelButtonTapped` action of the `effectsCancellationReducer`. This will cause the
   // test to fail, showing that we are exhaustively asserting that the effect truly is canceled and
   // will never emit.
-  @MainActor
-  func testTrivia_CancelButtonCancelsRequest() async {
+  @Test
+  func cancelButtonCancelsRequest() async {
     let store = TestStore(initialState: EffectsCancellation.State()) {
       EffectsCancellation()
     } withDependencies: {
@@ -66,8 +67,8 @@ final class EffectsCancellationTests: XCTestCase {
     }
   }
 
-  @MainActor
-  func testTrivia_PlusMinusButtonsCancelsRequest() async {
+  @Test
+  func plusMinusButtonsCancelsRequest() async {
     let store = TestStore(initialState: EffectsCancellation.State()) {
       EffectsCancellation()
     } withDependencies: {

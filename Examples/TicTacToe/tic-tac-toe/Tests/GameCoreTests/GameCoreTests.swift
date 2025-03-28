@@ -1,10 +1,11 @@
 import ComposableArchitecture
 import GameCore
-import XCTest
+import Testing
 
-final class GameCoreTests: XCTestCase {
-  @MainActor
-  func testFlow_Winner_Quit() async {
+@MainActor
+struct GameCoreTests {
+  @Test
+  func winnerQuits() async {
     let store = TestStore(
       initialState: Game.State(oPlayerName: "Blob Jr.", xPlayerName: "Blob Sr.")
     ) {
@@ -32,8 +33,8 @@ final class GameCoreTests: XCTestCase {
     }
   }
 
-  @MainActor
-  func testFlow_Tie() async {
+  @Test
+  func tie() async {
     let store = TestStore(
       initialState: Game.State(oPlayerName: "Blob Jr.", xPlayerName: "Blob Sr.")
     ) {

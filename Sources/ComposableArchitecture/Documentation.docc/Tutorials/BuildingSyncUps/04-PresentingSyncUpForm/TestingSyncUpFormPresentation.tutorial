@@ -173,7 +173,7 @@
     
     @Steps {
       @Step {
-        Add a new test method for testing the "Add sync-up" flow, but this time in an exhaustive 
+        Add a new test method for testing the "Add sync-up" flow, but this time in a non-exhaustive 
         manner.
         
         @Code(name: "SyncUpsListTests.swift", file: TestingSyncUpFormPresentation-02-code-0001.swift, previousFile: TestingSyncUpFormPresentation-02-code-0001-previous.swift)
@@ -201,17 +201,17 @@
       
       Already we can see a difference between non-exhaustive and exhaustive test stores. We are not
       specifying the trailing closure in
-      ``ComposableArchitecture/TestStore/send(_:assert:file:line:)-2co21`` to assert on state
+      ``ComposableArchitecture/TestStore/send(_:assert:fileID:file:line:column:)-8f2pl`` to assert on state
       changes, yet the test will still pass.
       
       A non-exhaustive store operates similarly to an exhaustive one, but with a few key 
       differences. In a non-exhaustive store, the `$0` handed to the trailing closure of
-      ``ComposableArchitecture/TestStore/send(_:assert:file:line:)-2co21`` is the state _after_
+      ``ComposableArchitecture/TestStore/send(_:assert:fileID:file:line:column:)-8f2pl`` is the state _after_
       the action has been processed, whereas in an exhaustive test store it is the state _before_.
       This means in non-exhaustive test stores you do not have make any mutations in the trailing
       closure if you do not want to. And anything you _do_ set in the trailing closure must match
       what was already there in order for the test to pass. See the dedicated article 
-      <doc:Testing#Non-exhaustive-testing> for more information.
+      <doc:TestingTCA#Non-exhaustive-testing> for more information.
       
       @Step {
         Emulate the user making edits to the sync-up, but again do not provide a trailing closure.

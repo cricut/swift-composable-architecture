@@ -50,9 +50,9 @@ import SwiftUI
 /// > it changes. As such, you should not rely on this value for anything other than checking the
 /// > current case, _e.g._ by switching on it and routing to an appropriate `CaseLet`.
 ///
-/// See ``Reducer/ifCaseLet(_:action:then:fileID:line:)-3k4yb`` and
-/// ``Scope/init(state:action:child:fileID:line:)-7yj7l`` for embedding reducers that operate on
-/// each case of an enum in reducers that operate on the entire enum.
+/// See ``Reducer/ifCaseLet(_:action:then:fileID:filePath:line:column:)-7sg8d`` and
+/// ``Scope/init(state:action:child:fileID:filePath:line:column:)-9g44g`` for embedding reducers
+/// that operate on each case of an enum in reducers that operate on the entire enum.
 @available(
   iOS, deprecated: 9999,
   message:
@@ -137,6 +137,10 @@ public struct CaseLet<EnumState, EnumAction, CaseState, CaseAction, Content: Vie
   ///   - fromCaseAction: A function that can embed a case action in a switch store action.
   ///   - content: A function that is given a store of the given case's state and returns a view
   ///     that is visible only when the switch store's state matches.
+  ///   - fileID: The fileID.
+  ///   - filePath: The filePath.
+  ///   - line: The line.
+  ///   - column: The column.
   public init(
     _ toCaseState: @escaping (EnumState) -> CaseState?,
     action fromCaseAction: @escaping (CaseAction) -> EnumAction,
@@ -157,12 +161,7 @@ public struct CaseLet<EnumState, EnumAction, CaseState, CaseAction, Content: Vie
 
   public var body: some View {
     IfLetStore(
-      self.store.wrappedValue.scope(
-        id: nil,
-        state: ToState(self.toCaseState),
-        action: self.fromCaseAction,
-        isInvalid: nil
-      ),
+      self.store.wrappedValue._scope(state: self.toCaseState, action: self.fromCaseAction),
       then: self.content,
       else: {
         _CaseLetMismatchView<EnumState, EnumAction>(

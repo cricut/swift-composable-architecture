@@ -88,7 +88,7 @@ struct NavigationID: Hashable, @unchecked Sendable {
     self.identifier = AnyHashableSendable(id)
   }
 
-  init<Value, Root, ID: Hashable>(
+  init<Value, Root, ID: Hashable & Sendable>(
     id: ID,
     keyPath: KeyPath<Root, IdentifiedArray<ID, Value>>
   ) {
@@ -121,12 +121,5 @@ struct NavigationID: Hashable, @unchecked Sendable {
     hasher.combine(self.kind)
     hasher.combine(self.identifier)
     hasher.combine(self.tag)
-  }
-}
-
-@_spi(Internals) public struct AnyHashableSendable: Hashable, @unchecked Sendable {
-  @_spi(Internals) public let base: AnyHashable
-  init<Base: Hashable & Sendable>(_ base: Base) {
-    self.base = base
   }
 }

@@ -1,11 +1,15 @@
 import ComposableArchitecture
-import XCTest
+import Foundation
+import Testing
 
 @testable import SyncUps
 
-final class SyncUpsListTests: XCTestCase {
-  @MainActor
-  func testAdd() async throws {
+@MainActor
+struct SyncUpsListTests {
+  init() { uncheckedUseMainSerialExecutor = true }
+
+  @Test
+  func add() async throws {
     let store = TestStore(initialState: SyncUpsList.State()) {
       SyncUpsList()
     } withDependencies: {
@@ -29,12 +33,12 @@ final class SyncUpsListTests: XCTestCase {
 
     await store.send(.confirmAddSyncUpButtonTapped) {
       $0.destination = nil
-      $0.syncUps = [syncUp]
+      $0.$syncUps.withLock { $0 = [syncUp] }
     }
   }
 
-  @MainActor
-  func testAdd_ValidatedAttendees() async throws {
+  @Test
+  func addAndConfirmValidatesAttendees() async throws {
     @Dependency(\.uuid) var uuid
 
     let store = TestStore(
@@ -60,15 +64,17 @@ final class SyncUpsListTests: XCTestCase {
 
     await store.send(.confirmAddSyncUpButtonTapped) {
       $0.destination = nil
-      $0.syncUps = [
-        SyncUp(
-          id: SyncUp.ID(uuidString: "deadbeef-dead-beef-dead-beefdeadbeef")!,
-          attendees: [
-            Attendee(id: Attendee.ID(UUID(0)))
-          ],
-          title: "Design"
-        )
-      ]
+      $0.$syncUps.withLock {
+        $0 = [
+          SyncUp(
+            id: SyncUp.ID(uuidString: "deadbeef-dead-beef-dead-beefdeadbeef")!,
+            attendees: [
+              Attendee(id: Attendee.ID(UUID(0)))
+            ],
+            title: "Design"
+          )
+        ]
+      }
     }
   }
 }

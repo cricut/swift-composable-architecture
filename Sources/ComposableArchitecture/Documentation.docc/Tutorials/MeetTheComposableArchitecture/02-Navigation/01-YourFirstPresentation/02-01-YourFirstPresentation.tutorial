@@ -102,7 +102,7 @@
       will first integrate the features' reducers, which consists of utilizing
       ``ComposableArchitecture/Presents()`` and ``ComposableArchitecture/PresentationAction``
       to integrate the domains, and the reducer operator
-      ``ComposableArchitecture/Reducer/ifLet(_:action:destination:fileID:line:)-4k9by`` to
+      ``ComposableArchitecture/Reducer/ifLet(_:action:destination:fileID:filePath:line:column:)-4ub6q`` to
       integrate the reducers.
     }
     
@@ -144,7 +144,7 @@
        
       @Step {
         Integrate the reducers together by making use of the
-        ``ComposableArchitecture/Reducer/ifLet(_:action:destination:fileID:line:)-4k9by``
+        ``ComposableArchitecture/Reducer/ifLet(_:action:destination:fileID:filePath:line:column:)-4ub6q``
         reducer operator.
         
         This creates a new reducer that runs the child reducer when a child 
@@ -258,10 +258,10 @@
       
       > Important: Delegate actions are the most general way of communicating from the child domain
       back to the parent, but there are other techniques. We could have also utilized the 
-      [`@Shared`](<doc:Shared>) property wrapper for the collection of sync ups, which would allow
-      the `AddContactFeature` to insert a new contact directly into the parent collection without
-      any further steps. This can be powerful, but we will use delegate actions for this tutorial.
-      To read more about `@Shared` see the <doc:SharingState> article, and see the
+      `@Shared` property wrapper for the collection of contacts, which would allow the
+      `AddContactFeature` to insert a new contact directly into the parent collection without any
+      further steps. This can be powerful, but we will use delegate actions for this tutorial. To
+      read more about `@Shared` see the <doc:SharingState> article, and see the
       <doc:BuildingSyncUps> tutorial where we use this technique, in particular in
       <doc:EditingAndDeletingSyncUp#Deleting-the-sync-up> section.
       

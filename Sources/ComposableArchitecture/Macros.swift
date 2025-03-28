@@ -2,7 +2,7 @@ import Observation
 
 /// Helps implement the conformance to the ``Reducer`` protocol for a type.
 ///
-/// See the article <doc:Reducers> for more information about the macro and ``Reducer`` protocol.
+/// See the article <doc:Reducer> for more information about the macro and ``Reducer`` protocol.
 @attached(
   member,
   names:
@@ -23,9 +23,9 @@ public macro Reducer() =
 /// An overload of ``Reducer()`` that takes a description of protocol conformances to synthesize on
 /// the State and Action types
 ///
-/// See the article <doc:Reducers> for more information about the macro and ``Reducer`` protocol, in
+/// See the article <doc:Reducer> for more information about the macro and ``Reducer`` protocol, in
 /// particular the section
-/// <doc:Reducers#Synthesizing-protocol-conformances-on-State-and-Action>.
+/// <doc:Reducer#Synthesizing-protocol-conformances-on-State-and-Action>.
 @attached(
   member,
   names:
@@ -38,6 +38,13 @@ public macro Reducer() =
 )
 @attached(memberAttribute)
 @attached(extension, conformances: Reducer, CaseReducer)
+#if compiler(>=6)
+  @available(iOS, deprecated: 9999, message: "Define your conformance via extension, instead.")@available(
+    macOS, deprecated: 9999, message: "Define your conformance via extension, instead."
+  )@available(tvOS, deprecated: 9999, message: "Define your conformance via extension, instead.")@available(
+    watchOS, deprecated: 9999, message: "Define your conformance via extension, instead."
+  )
+#endif
 public macro Reducer(state: _SynthesizedConformance..., action: _SynthesizedConformance...) =
   #externalMacro(
     module: "ComposableArchitectureMacros", type: "ReducerMacro"
@@ -47,8 +54,15 @@ public macro Reducer(state: _SynthesizedConformance..., action: _SynthesizedConf
 /// the ``Reducer()`` macro.
 ///
 /// See <doc:Reducers#Synthesizing-protocol-conformances-on-State-and-Action> for more information.
-@_documentation(visibility:public)
-public struct _SynthesizedConformance {}
+@_documentation(visibility: public)
+#if compiler(>=6)
+  @available(iOS, deprecated: 9999, message: "Define your conformance via extension, instead.")@available(
+    macOS, deprecated: 9999, message: "Define your conformance via extension, instead."
+  )@available(tvOS, deprecated: 9999, message: "Define your conformance via extension, instead.")@available(
+    watchOS, deprecated: 9999, message: "Define your conformance via extension, instead."
+  )
+#endif
+public struct _SynthesizedConformance: Sendable {}
 
 extension _SynthesizedConformance {
   /// Extends the `State` or `Action` types that ``Reducer()`` creates with the `Codable`
@@ -139,7 +153,7 @@ public macro Presents() =
 
 /// Provides a view with access to a feature's ``ViewAction``s.
 ///
-/// If you want to restrict what actions can be sent from the view you can use this macro along the
+/// If you want to restrict what actions can be sent from the view you can use this macro along with the
 /// ``ViewAction`` protocol. You start by conforming your reducer's `Action` enum to the
 /// ``ViewAction`` protocol, and moving view-specific actions to its own inner enum:
 ///

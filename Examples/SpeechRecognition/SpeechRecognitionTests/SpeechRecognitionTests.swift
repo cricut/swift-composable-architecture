@@ -1,11 +1,12 @@
 import ComposableArchitecture
-import XCTest
+import Testing
 
 @testable import SpeechRecognition
 
-final class SpeechRecognitionTests: XCTestCase {
-  @MainActor
-  func testDenyAuthorization() async {
+@MainActor
+struct SpeechRecognitionTests {
+  @Test
+  func denyAuthorization() async {
     let store = TestStore(initialState: SpeechRecognition.State()) {
       SpeechRecognition()
     } withDependencies: {
@@ -27,8 +28,8 @@ final class SpeechRecognitionTests: XCTestCase {
     }
   }
 
-  @MainActor
-  func testRestrictedAuthorization() async {
+  @Test
+  func restrictedAuthorization() async {
     let store = TestStore(initialState: SpeechRecognition.State()) {
       SpeechRecognition()
     } withDependencies: {
@@ -44,8 +45,8 @@ final class SpeechRecognitionTests: XCTestCase {
     }
   }
 
-  @MainActor
-  func testAllowAndRecord() async {
+  @Test
+  func allowAndRecord() async {
     let recognitionTask = AsyncThrowingStream.makeStream(of: SpeechRecognitionResult.self)
     let store = TestStore(initialState: SpeechRecognition.State()) {
       SpeechRecognition()
@@ -89,8 +90,8 @@ final class SpeechRecognitionTests: XCTestCase {
     await store.finish()
   }
 
-  @MainActor
-  func testAudioSessionFailure() async {
+  @Test
+  func audioSessionFailure() async {
     let recognitionTask = AsyncThrowingStream.makeStream(of: SpeechRecognitionResult.self)
     let store = TestStore(initialState: SpeechRecognition.State()) {
       SpeechRecognition()
@@ -111,8 +112,8 @@ final class SpeechRecognitionTests: XCTestCase {
     }
   }
 
-  @MainActor
-  func testAudioEngineFailure() async {
+  @Test
+  func audioEngineFailure() async {
     let recognitionTask = AsyncThrowingStream.makeStream(of: SpeechRecognitionResult.self)
     let store = TestStore(initialState: SpeechRecognition.State()) {
       SpeechRecognition()

@@ -1,13 +1,14 @@
 import ComposableArchitecture
-import XCTest
+import Testing
 
 @testable import SwiftUICaseStudies
 
-final class WebSocketTests: XCTestCase {
-  @MainActor
-  func testWebSocketHappyPath() async {
+@MainActor
+struct WebSocketTests {
+  @Test
+  func happyPath() async {
     let actions = AsyncStream.makeStream(of: WebSocketClient.Action.self)
-    let messages = AsyncStream.makeStream(of: Result<WebSocketClient.Message, Error>.self)
+    let messages = AsyncStream.makeStream(of: Result<WebSocketClient.Message, any Error>.self)
 
     let store = TestStore(initialState: WebSocket.State()) {
       WebSocket()
@@ -56,10 +57,10 @@ final class WebSocketTests: XCTestCase {
     await store.finish()
   }
 
-  @MainActor
-  func testWebSocketSendFailure() async {
+  @Test
+  func sendFailure() async {
     let actions = AsyncStream.makeStream(of: WebSocketClient.Action.self)
-    let messages = AsyncStream.makeStream(of: Result<WebSocketClient.Message, Error>.self)
+    let messages = AsyncStream.makeStream(of: Result<WebSocketClient.Message, any Error>.self)
 
     let store = TestStore(initialState: WebSocket.State()) {
       WebSocket()
@@ -103,8 +104,8 @@ final class WebSocketTests: XCTestCase {
     await store.finish()
   }
 
-  @MainActor
-  func testWebSocketPings() async {
+  @Test
+  func pings() async {
     let actions = AsyncStream.makeStream(of: WebSocketClient.Action.self)
     let clock = TestClock()
     var pingsCount = 0
@@ -115,7 +116,7 @@ final class WebSocketTests: XCTestCase {
       $0.continuousClock = clock
       $0.webSocket.open = { @Sendable _, _, _ in actions.stream }
       $0.webSocket.receive = { @Sendable _ in try await Task.never() }
-      $0.webSocket.sendPing = { @Sendable @MainActor _ in pingsCount += 1 }
+      $0.webSocket.sendPing = { @MainActor @Sendable _ in pingsCount += 1 }
     }
 
     // Connect to the socket
@@ -128,9 +129,9 @@ final class WebSocketTests: XCTestCase {
     }
 
     // Wait for ping
-    XCTAssertEqual(pingsCount, 0)
+    #expect(pingsCount == 0)
     await clock.advance(by: .seconds(10))
-    XCTAssertEqual(pingsCount, 1)
+    #expect(pingsCount == 1)
 
     // Disconnect from the socket
     await store.send(.connectButtonTapped) {
@@ -138,8 +139,8 @@ final class WebSocketTests: XCTestCase {
     }
   }
 
-  @MainActor
-  func testWebSocketConnectError() async {
+  @Test
+  func connectError() async {
     let actions = AsyncStream.makeStream(of: WebSocketClient.Action.self)
 
     let store = TestStore(initialState: WebSocket.State()) {

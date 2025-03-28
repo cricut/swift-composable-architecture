@@ -8,9 +8,10 @@ struct SpeechClient {
     .denied
   }
   var startTask:
-    @Sendable (_ request: SFSpeechAudioBufferRecognitionRequest) async -> AsyncThrowingStream<
-      SpeechRecognitionResult, Error
-    > = { _ in .finished() }
+    @Sendable (_ request: UncheckedSendable<SFSpeechAudioBufferRecognitionRequest>) async ->
+      AsyncThrowingStream<
+        SpeechRecognitionResult, Error
+      > = { _ in .finished() }
 }
 
 extension SpeechClient: DependencyKey {
@@ -26,20 +27,18 @@ extension SpeechClient: DependencyKey {
         }
       },
       startTask: { request in
-        await speech.startTask(request: request)
+        await speech.startTask(request: request.value)
       }
     )
   }
 
   static var previewValue: SpeechClient {
-    let isRecording = LockIsolated(false)
-    return Self(
+    Self(
       authorizationStatus: { .authorized },
       requestAuthorization: { .authorized },
       startTask: { _ in
         AsyncThrowingStream { continuation in
           Task { @MainActor in
-            isRecording.setValue(true)
             var finalText = """
               Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor \
               incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud \
@@ -49,7 +48,7 @@ extension SpeechClient: DependencyKey {
               officia deserunt mollit anim id est laborum.
               """
             var text = ""
-            while isRecording.value {
+            while !finalText.isEmpty {
               let word = finalText.prefix { $0 != " " }
               try await Task.sleep(for: .milliseconds(word.count * 50 + .random(in: 0...200)))
               finalText.removeFirst(word.count)
@@ -136,11 +135,11 @@ private actor Speech {
   private var audioEngine: AVAudioEngine? = nil
   private var recognitionTask: SFSpeechRecognitionTask? = nil
   private var recognitionContinuation:
-    AsyncThrowingStream<SpeechRecognitionResult, Error>.Continuation?
+    AsyncThrowingStream<SpeechRecognitionResult, any Error>.Continuation?
 
   func startTask(
     request: SFSpeechAudioBufferRecognitionRequest
-  ) -> AsyncThrowingStream<SpeechRecognitionResult, Error> {
+  ) -> AsyncThrowingStream<SpeechRecognitionResult, any Error> {
     AsyncThrowingStream { continuation in
       self.recognitionContinuation = continuation
       let audioSession = AVAudioSession.sharedInstance()

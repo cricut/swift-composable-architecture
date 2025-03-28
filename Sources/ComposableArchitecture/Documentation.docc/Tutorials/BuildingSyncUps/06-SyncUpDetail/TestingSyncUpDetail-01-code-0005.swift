@@ -1,16 +1,17 @@
 import ComposableArchitecture
-import XCTest
+import Testing
 
 @testable import SyncUps
 
-class SyncUpDetailTests: XCTestCase {
-  @MainActor
-  func testEdit() async {
+@MainActor
+struct SyncUpDetailTests {
+  @Test
+  func edit() async {
     let syncUp = SyncUp(
       id: SyncUp.ID(),
       title: "Point-Free Morning Sync"
     )
-    let store = TestStore(initialState: SyncUpDetail.State(syncUp: Shared(syncUp))) {
+    let store = TestStore(initialState: SyncUpDetail.State(syncUp: Shared(value: syncUp))) {
       SyncUpDetail()
     }
 
@@ -21,7 +22,7 @@ class SyncUpDetailTests: XCTestCase {
     var editedSyncUp = syncUp
     editedSyncUp.title = "Point-Free Evening Sync"
     await store.send(\.destination.edit.binding.syncUp, editedSyncUp) {
-      $0.destination?.edit?.syncUp = editedSyncUp
+      $0.destination?.modify(\.edit) { $0.syncUp = editedSyncUp }
     }
   }
 }

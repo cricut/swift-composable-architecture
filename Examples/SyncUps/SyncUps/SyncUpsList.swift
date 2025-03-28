@@ -3,7 +3,7 @@ import SwiftUI
 
 @Reducer
 struct SyncUpsList {
-  @Reducer(state: .equatable)
+  @Reducer
   enum Destination {
     case add(SyncUpForm)
     case alert(AlertState<Alert>)
@@ -54,7 +54,7 @@ struct SyncUpsList {
               ?? Attendee(id: Attendee.ID(uuid()))
           )
         }
-        state.syncUps.append(syncUp)
+        state.$syncUps.withLock { _ = $0.append(syncUp) }
         state.destination = nil
         return .none
 
@@ -66,20 +66,21 @@ struct SyncUpsList {
         return .none
 
       case let .onDelete(indexSet):
-        state.syncUps.remove(atOffsets: indexSet)
+        state.$syncUps.withLock { $0.remove(atOffsets: indexSet) }
         return .none
       }
     }
     .ifLet(\.$destination, action: \.destination)
   }
 }
+extension SyncUpsList.Destination.State: Equatable {}
 
 struct SyncUpsListView: View {
   @Bindable var store: StoreOf<SyncUpsList>
 
   var body: some View {
     List {
-      ForEach(store.$syncUps.elements) { $syncUp in
+      ForEach(Array(store.$syncUps)) { $syncUp in
         NavigationLink(state: AppFeature.Path.State.detail(SyncUpDetail.State(syncUp: $syncUp))) {
           CardView(syncUp: syncUp)
         }
@@ -160,7 +161,7 @@ extension LabelStyle where Self == TrailingIconLabelStyle {
     .productMock,
     .engineeringMock,
   ]
-  return NavigationStack {
+  NavigationStack {
     SyncUpsListView(
       store: Store(initialState: SyncUpsList.State()) {
         SyncUpsList()
@@ -179,12 +180,8 @@ extension LabelStyle where Self == TrailingIconLabelStyle {
   )
 }
 
-extension PersistenceReaderKey
-where Self == PersistenceKeyDefault<FileStorageKey<IdentifiedArrayOf<SyncUp>>> {
+extension SharedKey where Self == FileStorageKey<IdentifiedArrayOf<SyncUp>>.Default {
   static var syncUps: Self {
-    PersistenceKeyDefault(
-      .fileStorage(.documentsDirectory.appending(component: "sync-ups.json")),
-      []
-    )
+    Self[.fileStorage(.documentsDirectory.appending(component: "sync-ups.json")), default: []]
   }
 }

@@ -1,11 +1,12 @@
 import ComposableArchitecture
-import XCTest
+import Testing
 
 @testable import SwiftUICaseStudies
 
-final class SharedStateInMemoryTests: XCTestCase {
-  @MainActor
-  func testTabSelection() async {
+@MainActor
+struct SharedStateInMemoryTests {
+  @Test
+  func tabSelection() async {
     let store = TestStore(initialState: SharedStateInMemory.State()) {
       SharedStateInMemory()
     }
@@ -18,27 +19,27 @@ final class SharedStateInMemoryTests: XCTestCase {
     }
   }
 
-  @MainActor
-  func testSharedCounts() async {
+  @Test
+  func sharedCounts() async {
     let store = TestStore(initialState: SharedStateInMemory.State()) {
       SharedStateInMemory()
     }
 
     await store.send(.counter(.incrementButtonTapped)) {
-      $0.counter.stats.increment()
+      $0.counter.$stats.withLock { $0.increment() }
     }
 
     await store.send(.counter(.decrementButtonTapped)) {
-      $0.counter.stats.decrement()
+      $0.counter.$stats.withLock { $0.decrement() }
     }
 
     await store.send(.profile(.resetStatsButtonTapped)) {
-      $0.profile.stats = Stats()
+      $0.profile.$stats.withLock { $0 = Stats() }
     }
   }
 
-  @MainActor
-  func testAlert() async {
+  @Test
+  func alert() async {
     let store = TestStore(initialState: SharedStateInMemory.State()) {
       SharedStateInMemory()
     }

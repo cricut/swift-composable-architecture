@@ -1,6 +1,10 @@
-import Combine
+@preconcurrency import Combine
 @_spi(Internals) import ComposableArchitecture
 import XCTest
+
+#if canImport(Testing)
+  import Testing
+#endif
 
 final class StoreTests: BaseTCATestCase {
   var cancellables: Set<AnyCancellable> = []
@@ -9,11 +13,11 @@ final class StoreTests: BaseTCATestCase {
   func testCancellableIsRemovedOnImmediatelyCompletingEffect() {
     let store = Store<Void, Void>(initialState: ()) {}
 
-    XCTAssertEqual(store.rootStore.effectCancellables.count, 0)
+    XCTAssertEqual(store.effectCancellables.count, 0)
 
     store.send(())
 
-    XCTAssertEqual(store.rootStore.effectCancellables.count, 0)
+    XCTAssertEqual(store.effectCancellables.count, 0)
   }
 
   @MainActor
@@ -35,15 +39,15 @@ final class StoreTests: BaseTCATestCase {
     })
     let store = Store(initialState: ()) { reducer }
 
-    XCTAssertEqual(store.rootStore.effectCancellables.count, 0)
+    XCTAssertEqual(store.effectCancellables.count, 0)
 
     store.send(.start)
 
-    XCTAssertEqual(store.rootStore.effectCancellables.count, 1)
+    XCTAssertEqual(store.effectCancellables.count, 1)
 
     mainQueue.advance(by: 2)
 
-    XCTAssertEqual(store.rootStore.effectCancellables.count, 0)
+    XCTAssertEqual(store.effectCancellables.count, 0)
   }
 
   @available(*, deprecated)
@@ -238,8 +242,8 @@ final class StoreTests: BaseTCATestCase {
     XCTAssertEqual(numCalls3, 6)
   }
 
+  @MainActor
   func testSynchronousEffectsSentAfterSinking() {
-    @MainActor
     enum Action {
       case tap
       case next1
@@ -305,6 +309,7 @@ final class StoreTests: BaseTCATestCase {
   }
 
   @available(*, deprecated)
+  @MainActor
   func testIfLetAfterScope() {
     struct AppState: Equatable {
       var count: Int?
@@ -522,10 +527,9 @@ final class StoreTests: BaseTCATestCase {
       ])
   }
 
-  @MainActor
   func testCascadingTaskCancellation() async {
     enum Action { case task, response, response1, response2 }
-    let store = TestStore(initialState: 0) {
+    let store = await TestStore(initialState: 0) {
       Reduce<Int, Action> { state, action in
         switch action {
         case .task:
@@ -553,11 +557,10 @@ final class StoreTests: BaseTCATestCase {
     await task.cancel()
   }
 
-  @MainActor
   func testTaskCancellationEmpty() async {
     enum Action { case task }
 
-    let store = TestStore(initialState: 0) {
+    let store = await TestStore(initialState: 0) {
       Reduce<Int, Action> { state, action in
         switch action {
         case .task:
@@ -572,7 +575,7 @@ final class StoreTests: BaseTCATestCase {
   @available(*, deprecated)
   @MainActor
   func testScopeCancellation() async throws {
-    let neverEndingTask = Task<Void, Error> { try await Task.never() }
+    let neverEndingTask = Task<Void, any Error> { try await Task.never() }
 
     let store = Store(initialState: ()) {
       Reduce<Void, Void> { _, _ in
@@ -583,12 +586,12 @@ final class StoreTests: BaseTCATestCase {
     }
     let scopedStore = store.scope(state: { $0 }, action: { $0 })
 
-    let sendTask = scopedStore.send((), originatingFrom: nil)
+    let sendTask: Task? = scopedStore.send(())
     await Task.yield()
     neverEndingTask.cancel()
     try await XCTUnwrap(sendTask).value
-    XCTAssertEqual(store.rootStore.effectCancellables.count, 0)
-    XCTAssertEqual(scopedStore.rootStore.effectCancellables.count, 0)
+    XCTAssertEqual(store.effectCancellables.count, 0)
+    XCTAssertEqual(scopedStore.effectCancellables.count, 0)
   }
 
   @Reducer
@@ -608,6 +611,7 @@ final class StoreTests: BaseTCATestCase {
       }
     }
   }
+
   @MainActor
   func testOverrideDependenciesDirectlyOnReducer() {
     let store = Store(initialState: 0) {
@@ -631,6 +635,7 @@ final class StoreTests: BaseTCATestCase {
       }
     }
   }
+
   @MainActor
   func testOverrideDependenciesDirectlyOnStore() {
     @Dependency(\.uuid) var uuid
@@ -686,6 +691,7 @@ final class StoreTests: BaseTCATestCase {
       }
     }
   }
+
   @MainActor
   func testStoreVsTestStore() async {
     let testStore = TestStore(initialState: Feature_testStoreVsTestStore.State()) {
@@ -701,7 +707,7 @@ final class StoreTests: BaseTCATestCase {
     let store = Store(initialState: Feature_testStoreVsTestStore.State()) {
       Feature_testStoreVsTestStore()
     }
-    await store.send(.tap, originatingFrom: nil)?.value
+    await store.send(.tap)?.value
     XCTAssertEqual(store.withState(\.count), testStore.state.count)
   }
 
@@ -747,6 +753,7 @@ final class StoreTests: BaseTCATestCase {
       }
     }
   }
+
   @MainActor
   func testStoreVsTestStore_Publisher() async {
     let testStore = TestStore(initialState: Feature_testStoreVsTestStore_Publisher.State()) {
@@ -762,7 +769,7 @@ final class StoreTests: BaseTCATestCase {
     let store = Store(initialState: Feature_testStoreVsTestStore_Publisher.State()) {
       Feature_testStoreVsTestStore_Publisher()
     }
-    await store.send(.tap, originatingFrom: nil)?.value
+    await store.send(.tap)?.value
     XCTAssertEqual(store.withState(\.count), testStore.state.count)
   }
 
@@ -817,6 +824,7 @@ final class StoreTests: BaseTCATestCase {
       }
     }
   }
+
   @MainActor
   func testChildParentEffectCancellation() async throws {
     let mainQueue = DispatchQueue.test
@@ -1094,25 +1102,28 @@ final class StoreTests: BaseTCATestCase {
     enum Action {}
     var body: some ReducerOf<Self> { EmptyReducer() }
   }
-  @MainActor
-  func testInvalidatedStoreScope() async throws {
-    @Perception.Bindable var store = Store(
-      initialState: InvalidatedStoreScopeParentFeature.State(
-        child: InvalidatedStoreScopeChildFeature.State(
-          grandchild: InvalidatedStoreScopeGrandchildFeature.State()
+
+  #if !os(visionOS)
+    @MainActor
+    func testInvalidatedStoreScope() async throws {
+      @Perception.Bindable var store = Store(
+        initialState: InvalidatedStoreScopeParentFeature.State(
+          child: InvalidatedStoreScopeChildFeature.State(
+            grandchild: InvalidatedStoreScopeGrandchildFeature.State()
+          )
         )
-      )
-    ) {
-      InvalidatedStoreScopeParentFeature()
+      ) {
+        InvalidatedStoreScopeParentFeature()
+      }
+      store.send(.tap)
+
+      @Perception.Bindable var childStore = store.scope(state: \.child, action: \.child)!
+      let grandchildStoreBinding = $childStore.scope(state: \.grandchild, action: \.grandchild)
+
+      store.send(.child(.dismiss))
+      grandchildStoreBinding.wrappedValue = nil
     }
-    store.send(.tap)
-
-    @Perception.Bindable var childStore = store.scope(state: \.child, action: \.child)!
-    let grandchildStoreBinding = $childStore.scope(state: \.grandchild, action: \.grandchild)
-
-    store.send(.child(.dismiss))
-    grandchildStoreBinding.wrappedValue = nil
-  }
+  #endif
 
   @MainActor
   func testSurroundingDependencies() {
@@ -1139,7 +1150,119 @@ final class StoreTests: BaseTCATestCase {
       UUID(1)
     )
   }
+
+  @MainActor
+  func testStorePublisherRemovesSubscriptionOnCancel() {
+    let store = Store<Void, Void>(initialState: ()) {}
+    weak var subscription: AnyObject?
+    let cancellable = store.publisher
+      .handleEvents(receiveSubscription: { subscription = $0 as AnyObject })
+      .sink { _ in }
+    XCTAssertNotNil(subscription)
+    cancellable.cancel()
+    XCTAssertNil(subscription)
+  }
+
+  @MainActor
+  func testSubscriptionOwnsStorePublisher() {
+    var store: Store<Void, Void>? = Store(initialState: ()) {}
+    weak var weakStore = store
+    let cancellable = store!.publisher
+      .sink { _ in }
+    store = nil
+    XCTAssertNotNil(weakStore)
+    cancellable.cancel()
+    XCTAssertNil(weakStore)
+  }
+
+  @MainActor
+  func testSharedMutation() async {
+    XCTTODO(
+      """
+      Ideally this will pass in 2.0 but it's a breaking change for test stores to not eagerly \
+      process all received actions.
+      """
+    )
+
+    let store = TestStore(initialState: TestSharedMutation.State()) {
+      TestSharedMutation()
+    }
+    await store.send(.tap)
+    await store.receive(.response) {
+      $0.$bool.withLock { $0 = true }
+    }
+  }
+  @Reducer
+  struct TestSharedMutation {
+    struct State: Equatable {
+      @Shared(value: false) var bool
+    }
+    enum Action {
+      case tap
+      case response
+    }
+    var body: some ReducerOf<Self> {
+      Reduce { state, action in
+        switch action {
+        case .tap:
+          return .send(.response)
+        case .response:
+          state.$bool.withLock { $0.toggle() }
+          return .none
+        }
+      }
+    }
+  }
 }
+
+#if canImport(Testing)
+  @Suite
+  struct ModernStoreTests {
+    @available(iOS 16, macOS 13, tvOS 16, watchOS 9, *)
+    @Reducer
+    fileprivate struct TaskTreeFeature {
+      let clock: TestClock<Duration>
+      @ObservableState
+      struct State { var count = 0 }
+      enum Action { case tap, response1, response2 }
+      var body: some ReducerOf<Self> {
+        Reduce { state, action in
+          switch action {
+          case .tap:
+            return Effect.run { send in
+              await send(.response1)
+            }
+          case .response1:
+            state.count = 42
+            return Effect.run { send in
+              try await clock.sleep(for: .seconds(1))
+              await send(.response2)
+            }
+          case .response2:
+            state.count = 1729
+            return .none
+          }
+        }
+      }
+    }
+
+    @available(iOS 16, macOS 13, tvOS 16, watchOS 9, *)
+    @MainActor
+    @Test
+    func cancellation() async throws {
+      let clock = TestClock()
+      let store = Store(initialState: TaskTreeFeature.State()) { TaskTreeFeature(clock: clock) }
+      let task = store.send(.tap)
+      try await Task.sleep(for: .seconds(0.1))
+      #expect(store.count == 42)
+      task.cancel()
+      await clock.run()
+      withKnownIssue("Cancelling the root effect should not cancel the child effects.") {
+        #expect(store.count == 1729)
+      }
+    }
+  }
+#endif
 
 private struct Count: TestDependencyKey {
   var value: Int

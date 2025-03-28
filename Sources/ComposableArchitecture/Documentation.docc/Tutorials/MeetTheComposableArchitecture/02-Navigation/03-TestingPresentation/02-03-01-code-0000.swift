@@ -1,10 +1,11 @@
 import ComposableArchitecture
-import XCTest
+import Testing
 
 @testable import ContactsApp
 
 @MainActor
-final class ContactsFeatureTests: XCTestCase {
-  func testAddFlow() async {
+struct ContactsFeatureTests {
+  @Test
+  func addFlow() async {
   }
 }

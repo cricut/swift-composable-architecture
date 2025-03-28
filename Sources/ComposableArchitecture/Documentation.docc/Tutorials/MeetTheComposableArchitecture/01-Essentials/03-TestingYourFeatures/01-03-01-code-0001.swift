@@ -1,11 +1,12 @@
 import ComposableArchitecture
-import XCTest
+import Testing
 
 @testable import CounterApp
 
 @MainActor
-final class CounterFeatureTests: XCTestCase {
-  func testCounter() async {
-    
+struct CounterFeatureTests {
+  @Test
+  func basics() async {
+
   }
 }

@@ -1,11 +1,13 @@
 import ComposableArchitecture
-import XCTest
+import Foundation
+import Testing
 
 @testable import Search
 
-final class SearchTests: XCTestCase {
-  @MainActor
-  func testSearchAndClearQuery() async {
+@MainActor
+struct SearchTests {
+  @Test
+  func searchAndClearQuery() async {
     let store = TestStore(initialState: Search.State()) {
       Search()
     } withDependencies: {
@@ -25,8 +27,8 @@ final class SearchTests: XCTestCase {
     }
   }
 
-  @MainActor
-  func testSearchFailure() async {
+  @Test
+  func searchFailure() async {
     let store = TestStore(initialState: Search.State()) {
       Search()
     } withDependencies: {
@@ -43,8 +45,8 @@ final class SearchTests: XCTestCase {
     await store.receive(\.searchResponse.failure)
   }
 
-  @MainActor
-  func testClearQueryCancelsInFlightSearchRequest() async {
+  @Test
+  func clearQueryCancelsInFlightSearchRequest() async {
     let store = TestStore(initialState: Search.State()) {
       Search()
     } withDependencies: {
@@ -60,8 +62,8 @@ final class SearchTests: XCTestCase {
     }
   }
 
-  @MainActor
-  func testTapOnLocation() async {
+  @Test
+  func tapOnLocation() async {
     let specialResult = GeocodingSearch.Result(
       country: "Special Country",
       latitude: 0,
@@ -113,8 +115,8 @@ final class SearchTests: XCTestCase {
     }
   }
 
-  @MainActor
-  func testTapOnLocationCancelsInFlightRequest() async {
+  @Test
+  func tapOnLocationCancelsInFlightRequest() async {
     let specialResult = GeocodingSearch.Result(
       country: "Special Country",
       latitude: 0,
@@ -175,8 +177,8 @@ final class SearchTests: XCTestCase {
     }
   }
 
-  @MainActor
-  func testTapOnLocationFailure() async {
+  @Test
+  func tapOnLocationFailure() async {
     let results = GeocodingSearch.mock.results
 
     let store = TestStore(initialState: Search.State(results: results)) {

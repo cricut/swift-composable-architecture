@@ -4,7 +4,7 @@ import Combine
 /// A property wrapper for state that can be presented.
 ///
 /// Use this property wrapper for modeling a feature's domain that needs to present a child feature
-/// using ``Reducer/ifLet(_:action:destination:fileID:line:)-4k9by``.
+/// using ``Reducer/ifLet(_:action:destination:fileID:filePath:line:column:)-4ub6q``.
 ///
 /// For example, if you have a `ChildFeature` reducer that encapsulates the logic and behavior for a
 /// feature, then any feature that wants to present that feature will hold onto `ChildFeature.State`
@@ -23,7 +23,7 @@ import Combine
 ///
 /// For the most part your feature's logic can deal with `child` as a plain optional value, but
 /// there are times you need to know that you are secretly dealing with `PresentationState`. For
-/// example, when using the ``Reducer/ifLet(_:action:destination:fileID:line:)-4k9by`` reducer operator to
+/// example, when using the ``Reducer/ifLet(_:action:destination:fileID:filePath:line:column:)-4ub6q`` reducer operator to
 /// integrate the parent and child features together, you will construct a key path to the projected
 /// value `\.$child`:
 ///
@@ -202,7 +202,7 @@ extension PresentationState: Hashable where State: Hashable {
 extension PresentationState: Sendable where State: Sendable {}
 
 extension PresentationState: Decodable where State: Decodable {
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     do {
       self.init(wrappedValue: try decoder.singleValueContainer().decode(State.self))
     } catch {
@@ -212,7 +212,7 @@ extension PresentationState: Decodable where State: Decodable {
 }
 
 extension PresentationState: Encodable where State: Encodable {
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     do {
       var container = encoder.singleValueContainer()
       try container.encode(self.wrappedValue)
@@ -231,7 +231,7 @@ extension PresentationState: CustomReflectable {
 /// A wrapper type for actions that can be presented.
 ///
 /// Use this wrapper type for modeling a feature's domain that needs to present a child
-/// feature using ``Reducer/ifLet(_:action:destination:fileID:line:)-4k9by``.
+/// feature using ``Reducer/ifLet(_:action:destination:fileID:filePath:line:column:)-4ub6q``.
 ///
 /// For example, if you have a `ChildFeature` reducer that encapsulates the logic and behavior
 /// for a feature, then any feature that wants to present that feature will hold onto
@@ -296,7 +296,8 @@ extension PresentationAction: CasePathable {
       dynamicMember keyPath: CaseKeyPath<Action, AppendedAction>
     ) -> AnyCasePath<PresentationAction, AppendedAction>
     where Action: CasePathable {
-      AnyCasePath<PresentationAction, AppendedAction>(
+      let keyPath = keyPath.unsafeSendable()
+      return AnyCasePath<PresentationAction, AppendedAction>(
         embed: { .presented(keyPath($0)) },
         extract: {
           guard case let .presented(action) = $0 else { return nil }
@@ -310,7 +311,8 @@ extension PresentationAction: CasePathable {
       dynamicMember keyPath: CaseKeyPath<Action, AppendedAction>
     ) -> AnyCasePath<PresentationAction, PresentationAction<AppendedAction>>
     where Action: CasePathable {
-      AnyCasePath<PresentationAction, PresentationAction<AppendedAction>>(
+      let keyPath = keyPath.unsafeSendable()
+      return AnyCasePath<PresentationAction, PresentationAction<AppendedAction>>(
         embed: {
           switch $0 {
           case .dismiss:
@@ -398,6 +400,10 @@ extension Reducer {
   ///   - toPresentationAction: A case path from parent action to a case containing child actions.
   ///   - destination: A reducer that will be invoked with child actions against presented child
   ///     state.
+  ///   - fileID: The fileID.
+  ///   - filePath: The filePath.
+  ///   - line: The line.
+  ///   - column: The column.
   /// - Returns: A reducer that combines the child reducer with the parent reducer.
   @warn_unqualified_access
   @inlinable
@@ -424,7 +430,7 @@ extension Reducer {
     )
   }
 
-  /// A special overload of ``Reducer/ifLet(_:action:destination:fileID:line:)-4k9by`` for alerts
+  /// A special overload of ``Reducer/ifLet(_:action:destination:fileID:filePath:line:column:)-4ub6q`` for alerts
   /// and confirmation dialogs that does not require a child reducer.
   @warn_unqualified_access
   @inlinable
@@ -607,7 +613,7 @@ public struct _PresentationReducer<Base: Reducer, Destination: Reducer>: Reducer
         .reduce(
           into: &state[keyPath: self.toPresentationState].wrappedValue!, action: destinationAction
         )
-        .map { self.toPresentationAction.embed(.presented($0)) }
+        .map { [toPresentationAction] in toPresentationAction.embed(.presented($0)) }
         ._cancellable(navigationIDPath: destinationNavigationIDPath)
       baseEffects = self.base.reduce(into: &state, action: action)
       if let ephemeralType = ephemeralType(of: destinationState),
@@ -639,7 +645,7 @@ public struct _PresentationReducer<Base: Reducer, Destination: Reducer>: Reducer
         destination reducers can handle their actions while their state is still present.
 
         • This action was sent to the store while destination state was "nil". Make sure that \
-        actions for this reducer can only be sent from a view store when state is present, or \
+        actions for this reducer can only be sent from a store when state is present, or \
         from effects that start from this reducer. In SwiftUI applications, use a Composable \
         Architecture view modifier like "sheet(store:…)".
         """,
@@ -710,15 +716,15 @@ public struct _PresentationReducer<Base: Reducer, Destination: Reducer>: Reducer
 }
 
 @usableFromInline
-struct PresentationDismissID: Hashable {
+struct PresentationDismissID: Hashable, Sendable {
   @usableFromInline init() {}
 }
 @usableFromInline
-struct OnFirstAppearID: Hashable {
+struct OnFirstAppearID: Hashable, Sendable {
   @usableFromInline init() {}
 }
 
-public struct _PresentedID: Hashable {
+public struct _PresentedID: Hashable, Sendable {
   @inlinable
   public init() {
     self.init(internal: ())
@@ -729,8 +735,8 @@ public struct _PresentedID: Hashable {
 }
 
 extension Task<Never, Never> {
-  internal static func _cancel<ID: Hashable>(
-    id: ID,
+  internal static func _cancel(
+    id: some Hashable & Sendable,
     navigationID: NavigationIDPath
   ) {
     withDependencies {
@@ -742,8 +748,8 @@ extension Task<Never, Never> {
 }
 
 extension Effect {
-  internal func _cancellable<ID: Hashable>(
-    id: ID = _PresentedID(),
+  internal func _cancellable(
+    id: some Hashable & Sendable = _PresentedID(),
     navigationIDPath: NavigationIDPath,
     cancelInFlight: Bool = false
   ) -> Self {
@@ -753,8 +759,8 @@ extension Effect {
       self.cancellable(id: id, cancelInFlight: cancelInFlight)
     }
   }
-  internal static func _cancel<ID: Hashable>(
-    id: ID = _PresentedID(),
+  internal static func _cancel(
+    id: some Hashable & Sendable = _PresentedID(),
     navigationID: NavigationIDPath
   ) -> Self {
     withDependencies {

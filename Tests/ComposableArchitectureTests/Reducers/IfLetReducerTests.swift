@@ -3,9 +3,8 @@ import XCTest
 
 @available(*, deprecated, message: "TODO: Update to use case pathable syntax with Swift 5.9")
 final class IfLetReducerTests: BaseTCATestCase {
-  @MainActor
   func testNilChild() async {
-    let store = TestStore(initialState: Int?.none) {
+    let store = await TestStore(initialState: Int?.none) {
       EmptyReducer<Int?, Void>()
         .ifLet(\.self, action: \.self) {}
     }
@@ -30,7 +29,7 @@ final class IfLetReducerTests: BaseTCATestCase {
         before child state becomes "nil", especially if it is a long-living effect.
 
         • This action was sent to the store while state was "nil". Make sure that actions for \
-        this reducer can only be sent from a view store when state is non-"nil". In SwiftUI \
+        this reducer can only be sent from a store when state is non-"nil". In SwiftUI \
         applications, use "IfLetStore".
         """
     }
@@ -38,7 +37,6 @@ final class IfLetReducerTests: BaseTCATestCase {
     await store.send(())
   }
 
-  @MainActor
   func testEffectCancellation() async {
     if #available(iOS 16, macOS 13, tvOS 16, watchOS 9, *) {
       struct Child: Reducer {
@@ -90,7 +88,7 @@ final class IfLetReducerTests: BaseTCATestCase {
         }
       }
       let clock = TestClock()
-      let store = TestStore(initialState: Parent.State()) {
+      let store = await TestStore(initialState: Parent.State()) {
         Parent()
       } withDependencies: {
         $0.continuousClock = clock
@@ -116,7 +114,6 @@ final class IfLetReducerTests: BaseTCATestCase {
     }
   }
 
-  @MainActor
   func testGrandchildEffectCancellation() async {
     if #available(iOS 16, macOS 13, tvOS 16, watchOS 9, *) {
       struct GrandChild: Reducer {
@@ -186,7 +183,7 @@ final class IfLetReducerTests: BaseTCATestCase {
         }
       }
       let clock = TestClock()
-      let store = TestStore(initialState: Parent.State()) {
+      let store = await TestStore(initialState: Parent.State()) {
         Parent()
       } withDependencies: {
         $0.continuousClock = clock
@@ -209,7 +206,6 @@ final class IfLetReducerTests: BaseTCATestCase {
     }
   }
 
-  @MainActor
   func testEphemeralState() async {
     if #available(iOS 16, macOS 13, tvOS 16, watchOS 9, *) {
       struct Parent: Reducer {
@@ -235,7 +231,7 @@ final class IfLetReducerTests: BaseTCATestCase {
           }
         }
       }
-      let store = TestStore(initialState: Parent.State()) {
+      let store = await TestStore(initialState: Parent.State()) {
         Parent()
       }
       await store.send(.tap) {
@@ -247,7 +243,6 @@ final class IfLetReducerTests: BaseTCATestCase {
     }
   }
 
-  @MainActor
   func testIdentifiableChild() async {
     struct Feature: Reducer {
       struct State: Equatable {
@@ -299,7 +294,7 @@ final class IfLetReducerTests: BaseTCATestCase {
     }
 
     let mainQueue = DispatchQueue.test
-    let store = TestStore(initialState: Feature.State(child: Child.State(id: 1))) {
+    let store = await TestStore(initialState: Feature.State(child: Child.State(id: 1))) {
       Feature()
     } withDependencies: {
       $0.mainQueue = mainQueue.eraseToAnyScheduler()
@@ -316,7 +311,6 @@ final class IfLetReducerTests: BaseTCATestCase {
     }
   }
 
-  @MainActor
   func testEphemeralDismissal() async {
     struct Feature: Reducer {
       struct State: Equatable {
@@ -336,7 +330,7 @@ final class IfLetReducerTests: BaseTCATestCase {
           case .alert(.ok):
             return .none
           case .alert(.again), .tap:
-            state.alert = AlertState(title: TextState("Hello"))
+            state.alert = AlertState { TextState("Hello") }
             return .none
           }
         }
@@ -344,10 +338,10 @@ final class IfLetReducerTests: BaseTCATestCase {
       }
     }
 
-    let store = TestStore(initialState: Feature.State()) { Feature() }
+    let store = await TestStore(initialState: Feature.State()) { Feature() }
 
     await store.send(.tap) {
-      $0.alert = AlertState(title: TextState("Hello"))
+      $0.alert = AlertState { TextState("Hello") }
     }
     await store.send(.alert(.again))
     await store.send(.alert(.ok)) {

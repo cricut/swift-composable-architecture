@@ -1,11 +1,12 @@
 import ComposableArchitecture
-import XCTest
+import Testing
 
 @testable import SwiftUICaseStudies
 
-final class BindingFormTests: XCTestCase {
-  @MainActor
-  func testBasics() async {
+@MainActor
+struct BindingFormTests {
+  @Test
+  func basics() async {
     let store = TestStore(initialState: BindingForm.State()) {
       BindingForm()
     }

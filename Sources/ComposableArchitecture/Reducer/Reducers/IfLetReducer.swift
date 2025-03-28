@@ -40,7 +40,7 @@ extension Reducer {
   ///   * Automatically `nil`s out child state when an action is sent for alerts and confirmation
   ///     dialogs.
   ///
-  /// See ``Reducer/ifLet(_:action:destination:fileID:line:)-4k9by`` for a more advanced operator suited
+  /// See ``Reducer/ifLet(_:action:destination:fileID:filePath:line:column:)-4ub6q`` for a more advanced operator suited
   /// to navigation.
   ///
   /// - Parameters:
@@ -49,6 +49,10 @@ extension Reducer {
   ///   - toWrappedAction: A case path from parent action to a case containing child actions.
   ///   - wrapped: A reducer that will be invoked with child actions against non-optional child
   ///     state.
+  ///   - fileID: The fileID.
+  ///   - filePath: The filePath.
+  ///   - line: The line.
+  ///   - column: The column.
   /// - Returns: A reducer that combines the child reducer with the parent reducer.
   @inlinable
   @warn_unqualified_access
@@ -73,8 +77,8 @@ extension Reducer {
     )
   }
 
-  /// A special overload of ``Reducer/ifLet(_:action:then:fileID:line:)-7s8h2`` for alerts
-  /// and confirmation dialogs that does not require a child reducer.
+  /// A special overload of ``Reducer/ifLet(_:action:then:fileID:filePath:line:column:)-2r2pn``
+  /// for alerts and confirmation dialogs that does not require a child reducer.
   @inlinable
   @warn_unqualified_access
   public func ifLet<WrappedState: _EphemeralState, WrappedAction>(
@@ -299,7 +303,7 @@ public struct _IfLetReducer<Parent: Reducer, Child: Reducer>: Reducer {
         before child state becomes "nil", especially if it is a long-living effect.
 
         • This action was sent to the store while state was "nil". Make sure that actions for this \
-        reducer can only be sent from a view store when state is non-"nil". In SwiftUI \
+        reducer can only be sent from a store when state is non-"nil". In SwiftUI \
         applications, use "IfLetStore".
         """,
         fileID: fileID,
@@ -314,7 +318,7 @@ public struct _IfLetReducer<Parent: Reducer, Child: Reducer>: Reducer {
     return self.child
       .dependency(\.navigationIDPath, self.navigationIDPath.appending(navigationID))
       .reduce(into: &state[keyPath: self.toChildState]!, action: childAction)
-      .map { self.toChildAction.embed($0) }
+      .map { [toChildAction] in toChildAction.embed($0) }
       ._cancellable(id: navigationID, navigationIDPath: self.navigationIDPath)
   }
 }

@@ -1,11 +1,12 @@
 import ComposableArchitecture
-import XCTest
+import Testing
 
 @testable import SwiftUICaseStudies
 
-final class EffectsBasicsTests: XCTestCase {
-  @MainActor
-  func testCountDown() async {
+@MainActor
+struct EffectsBasicsTests {
+  @Test
+  func countDown() async {
     let store = TestStore(initialState: EffectsBasics.State()) {
       EffectsBasics()
     } withDependencies: {
@@ -20,8 +21,8 @@ final class EffectsBasicsTests: XCTestCase {
     }
   }
 
-  @MainActor
-  func testNumberFact() async {
+  @Test
+  func numberFact() async {
     let store = TestStore(initialState: EffectsBasics.State()) {
       EffectsBasics()
     } withDependencies: {
@@ -41,8 +42,8 @@ final class EffectsBasicsTests: XCTestCase {
     }
   }
 
-  @MainActor
-  func testDecrement() async {
+  @Test
+  func decrement() async {
     let store = TestStore(initialState: EffectsBasics.State()) {
       EffectsBasics()
     } withDependencies: {
@@ -57,8 +58,8 @@ final class EffectsBasicsTests: XCTestCase {
     }
   }
 
-  @MainActor
-  func testDecrementCancellation() async {
+  @Test
+  func decrementCancellation() async {
     let store = TestStore(initialState: EffectsBasics.State()) {
       EffectsBasics()
     } withDependencies: {

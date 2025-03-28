@@ -101,9 +101,8 @@ final class BindingTests: BaseTCATestCase {
     XCTAssertEqual(store.withState { $0.nested.field }, "Hello!")
   }
 
-  @MainActor
   func testBindingActionUpdatesRespectsPatternMatching() async {
-    let testStore = TestStore(
+    let testStore = await TestStore(
       initialState: BindingTest.State(nested: BindingTest.State.Nested(field: ""))
     ) {
       BindingTest()

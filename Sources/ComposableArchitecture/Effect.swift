@@ -1,10 +1,10 @@
-import Combine
+@preconcurrency import Combine
 import Foundation
 import SwiftUI
 
-public struct Effect<Action> {
+public struct Effect<Action>: Sendable {
   @usableFromInline
-  enum Operation {
+  enum Operation: Sendable {
     case none
     case publisher(AnyPublisher<Action, Never>)
     case run(TaskPriority? = nil, @Sendable (_ send: Send<Action>) async -> Void)
@@ -46,11 +46,11 @@ extension Effect {
 
   /// Wraps an asynchronous unit of work that can emit actions any number of times in an effect.
   ///
-  /// For example, if you had an async stream in a dependency client:
+  /// For example, if you had an async sequence in a dependency client:
   ///
   /// ```swift
   /// struct EventsClient {
-  ///   var events: () -> AsyncStream<Event>
+  ///   var events: () -> any AsyncSequence<Event, Never>
   /// }
   /// ```
   ///
@@ -68,22 +68,26 @@ extension Effect {
   ///
   /// See ``Send`` for more information on how to use the `send` argument passed to `run`'s closure.
   ///
-  /// The closure provided to ``run(priority:operation:catch:fileID:line:)`` is allowed to
-  /// throw, but any non-cancellation errors thrown will cause a runtime warning when run in the
-  /// simulator or on a device, and will cause a test failure in tests. To catch non-cancellation
-  /// errors use the `catch` trailing closure.
+  /// The closure provided to ``run(priority:operation:catch:fileID:filePath:line:column:)`` is
+  /// allowed to throw, but any non-cancellation errors thrown will cause a runtime warning when run
+  /// in the simulator or on a device, and will cause a test failure in tests. To catch
+  /// non-cancellation errors use the `catch` trailing closure.
   ///
   /// - Parameters:
   ///   - priority: Priority of the underlying task. If `nil`, the priority will come from
   ///     `Task.currentPriority`.
   ///   - operation: The operation to execute.
-  ///   - catch: An error handler, invoked if the operation throws an error other than
+  ///   - handler: An error handler, invoked if the operation throws an error other than
   ///     `CancellationError`.
+  ///   - fileID: The fileID.
+  ///   - filePath: The filePath.
+  ///   - line: The line.
+  ///   - column: The column.
   /// - Returns: An effect wrapping the given asynchronous work.
   public static func run(
     priority: TaskPriority? = nil,
     operation: @escaping @Sendable (_ send: Send<Action>) async throws -> Void,
-    catch handler: (@Sendable (_ error: Error, _ send: Send<Action>) async -> Void)? = nil,
+    catch handler: (@Sendable (_ error: any Error, _ send: Send<Action>) async -> Void)? = nil,
     fileID: StaticString = #fileID,
     filePath: StaticString = #filePath,
     line: UInt = #line,
@@ -153,29 +157,29 @@ extension Effect {
 }
 
 /// A type that can send actions back into the system when used from
-/// ``Effect/run(priority:operation:catch:fileID:line:)``.
+/// ``Effect/run(priority:operation:catch:fileID:filePath:line:column:)``.
 ///
 /// This type implements [`callAsFunction`][callAsFunction] so that you invoke it as a function
 /// rather than calling methods on it:
 ///
 /// ```swift
 /// return .run { send in
-///   send(.started)
-///   defer { send(.finished) }
+///   await send(.started)
 ///   for await event in self.events {
 ///     send(.event(event))
 ///   }
+///   await send(.finished)
 /// }
 /// ```
 ///
-/// You can also send actions with animation:
+/// You can also send actions with animation and transaction:
 ///
 /// ```swift
-/// send(.started, animation: .spring())
-/// defer { send(.finished, animation: .default) }
+/// await send(.started, animation: .spring())
+/// await send(.finished, transaction: .init(animation: .default))
 /// ```
 ///
-/// See ``Effect/run(priority:operation:catch:fileID:line:)`` for more information on how to
+/// See ``Effect/run(priority:operation:catch:fileID:filePath:line:column:)`` for more information on how to
 /// use this value to construct effects that can emit any number of times in an asynchronous
 /// context.
 ///
@@ -346,7 +350,7 @@ extension Effect {
   /// - Returns: A publisher that uses the provided closure to map elements from the upstream effect
   ///   to new elements that it then publishes.
   @inlinable
-  public func map<T>(_ transform: @escaping (Action) -> T) -> Effect<T> {
+  public func map<T>(_ transform: @escaping @Sendable (Action) -> T) -> Effect<T> {
     switch self.operation {
     case .none:
       return .none

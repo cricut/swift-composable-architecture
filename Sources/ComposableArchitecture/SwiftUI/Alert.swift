@@ -2,19 +2,24 @@ import SwiftUI
 
 @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *)
 extension View {
-  /// Displays an alert when then store's state becomes non-`nil`, and dismisses it when it becomes
+  /// Displays an alert when the store's state becomes non-`nil`, and dismisses it when it becomes
   /// `nil`.
   ///
   /// - Parameters:
   ///   - store: A store that is focused on ``PresentationState`` and ``PresentationAction`` for an
   ///     alert.
+  #if swift(<5.10)
+    @MainActor(unsafe)
+  #else
+    @preconcurrency@MainActor
+  #endif
   public func alert<ButtonAction>(
     store: Store<PresentationState<AlertState<ButtonAction>>, PresentationAction<ButtonAction>>
   ) -> some View {
     self._alert(store: store, state: { $0 }, action: { $0 })
   }
 
-  /// Displays an alert when then store's state becomes non-`nil`, and dismisses it when it becomes
+  /// Displays an alert when the store's state becomes non-`nil`, and dismisses it when it becomes
   /// `nil`.
   ///
   /// - Parameters:
@@ -43,6 +48,11 @@ extension View {
     message:
       "Further scope the store into the 'state' and 'action' cases, instead. For more information, see the following article: https://pointfreeco.github.io/swift-composable-architecture/main/documentation/composablearchitecture/migratingto1.5#Enum-driven-navigation-APIs"
   )
+  #if swift(<5.10)
+    @MainActor(unsafe)
+  #else
+    @preconcurrency@MainActor
+  #endif
   public func alert<State, Action, ButtonAction>(
     store: Store<PresentationState<State>, PresentationAction<Action>>,
     state toDestinationState: @escaping (_ state: State) -> AlertState<ButtonAction>?,
@@ -51,6 +61,11 @@ extension View {
     self._alert(store: store, state: toDestinationState, action: fromDestinationAction)
   }
 
+  #if swift(<5.10)
+    @MainActor(unsafe)
+  #else
+    @preconcurrency@MainActor
+  #endif
   private func _alert<State, Action, ButtonAction>(
     store: Store<PresentationState<State>, PresentationAction<Action>>,
     state toDestinationState: @escaping (_ state: State) -> AlertState<ButtonAction>?,

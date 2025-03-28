@@ -3,7 +3,7 @@ import SwiftUI
 
 @Reducer
 struct AppFeature {
-  @Reducer(state: .equatable)
+  @Reducer
   enum Path {
     case detail(SyncUpDetail)
     case meeting(Meeting, syncUp: SyncUp)
@@ -47,15 +47,14 @@ struct AppFeature {
     .forEach(\.path, action: \.path)
   }
 }
+extension AppFeature.Path.State: Equatable {}
 
 struct AppView: View {
   @Bindable var store: StoreOf<AppFeature>
 
   var body: some View {
     NavigationStack(path: $store.scope(state: \.path, action: \.path)) {
-      SyncUpsListView(
-        store: store.scope(state: \.syncUpsList, action: \.syncUpsList)
-      )
+      SyncUpsListView(store: store.scope(state: \.syncUpsList, action: \.syncUpsList))
     } destination: { store in
       switch store.case {
       case let .detail(store):
@@ -75,7 +74,7 @@ struct AppView: View {
     .productMock,
     .engineeringMock,
   ]
-  return AppView(
+  AppView(
     store: Store(initialState: AppFeature.State()) {
       AppFeature()
     }

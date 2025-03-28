@@ -1,11 +1,13 @@
 import ComposableArchitecture
-import XCTest
+import Foundation
+import Testing
 
 @testable import ContactsApp
 
 @MainActor
-final class ContactsFeatureTests: XCTestCase {
-  func testAddFlow_NonExhaustive() async {
+struct ContactsFeatureTests {
+  @Test
+  func addFlowNonExhaustive() async {
     let store = TestStore(initialState: ContactsFeature.State()) {
       ContactsFeature()
     } withDependencies: {

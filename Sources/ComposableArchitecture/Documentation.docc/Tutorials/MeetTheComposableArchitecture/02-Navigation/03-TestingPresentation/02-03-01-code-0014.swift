@@ -1,11 +1,13 @@
 import ComposableArchitecture
-import XCTest
+import Foundation
+import Testing
 
 @testable import ContactsApp
 
 @MainActor
-final class ContactsFeatureTests: XCTestCase {
-  func testAddFlow() async {
+struct ContactsFeatureTests {
+  @Test
+  func addFlow() async {
     let store = TestStore(initialState: ContactsFeature.State()) {
       ContactsFeature()
     } withDependencies: {
@@ -20,7 +22,7 @@ final class ContactsFeatureTests: XCTestCase {
       )
     }
     await store.send(\.destination.addContact.setName, "Blob Jr.") {
-      $0.destination?.addContact?.contact.name = "Blob Jr."
+      $0.destination?.modify(\.addContact) { $0.contact.name = "Blob Jr." }
     }
     await store.send(\.destination.addContact.saveButtonTapped)
     await store.receive(

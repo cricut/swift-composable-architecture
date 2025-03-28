@@ -5,177 +5,6 @@
 
   final class RuntimeWarningTests: BaseTCATestCase {
     @MainActor
-    func testStoreCreationMainThread() async {
-      uncheckedUseMainSerialExecutor = false
-      XCTExpectFailure {
-        $0.compactDescription == """
-          failed - A store initialized on a non-main thread. …
-
-          The "Store" class is not thread-safe, and so all interactions with an instance of "Store" \
-          (including all of its scopes and derived view stores) must be done on the main thread.
-          """
-      }
-
-      _ = await Task.detached {
-        _ = Store<Int, Void>(initialState: 0) {}
-      }
-      .value
-    }
-
-    @MainActor
-    func testEffectFinishedMainThread() async throws {
-      XCTExpectFailure {
-        $0.compactDescription == """
-          failed - An effect completed on a non-main thread. …
-
-            Effect returned from:
-              RuntimeWarningTests.Action.tap
-
-          Make sure to use ".receive(on:)" on any effects that execute on background threads to \
-          receive their output on the main thread.
-
-          The "Store" class is not thread-safe, and so all interactions with an instance of "Store" \
-          (including all of its scopes and derived view stores) must be done on the main thread.
-          """
-      }
-
-      enum Action { case tap, response }
-      let store = Store(initialState: 0) {
-        Reduce<Int, Action> { state, action in
-          switch action {
-          case .tap:
-            return .publisher {
-              Empty()
-                .receive(on: DispatchQueue(label: "background"))
-            }
-          case .response:
-            return .none
-          }
-        }
-      }
-      await store.send(.tap).finish()
-    }
-
-    @MainActor
-    func testStoreScopeMainThread() async {
-      uncheckedUseMainSerialExecutor = false
-      XCTExpectFailure {
-        [
-          """
-          failed - "Store.scope" was called on a non-main thread. …
-
-          The "Store" class is not thread-safe, and so all interactions with an instance of \
-          "Store" (including all of its scopes and derived view stores) must be done on the main \
-          thread.
-          """,
-          """
-          failed - A store initialized on a non-main thread. …
-
-          The "Store" class is not thread-safe, and so all interactions with an instance of "Store" \
-          (including all of its scopes and derived view stores) must be done on the main thread.
-          """,
-        ].contains($0.compactDescription)
-      }
-
-      let store = Store<Int, Void>(initialState: 0) {}
-      await Task.detached {
-        _ = store.scope(state: \.self, action: \.self)
-      }
-      .value
-    }
-
-    @MainActor
-    func testViewStoreSendMainThread() async {
-      uncheckedUseMainSerialExecutor = false
-      XCTExpectFailure {
-        $0.compactDescription == """
-          failed - "Store.send" was called on a non-main thread with: () …
-
-          The "Store" class is not thread-safe, and so all interactions with an instance of \
-          "Store" (including all of its scopes and derived view stores) must be done on the main \
-          thread.
-          """
-      }
-
-      let store = Store<Int, Void>(initialState: 0) {}
-      await Task.detached {
-        _ = store.send(())
-      }
-      .value
-    }
-
-    @MainActor
-    func testEffectEmitMainThread() async throws {
-      XCTExpectFailure {
-        [
-          """
-          failed - An effect completed on a non-main thread. …
-
-            Effect returned from:
-              RuntimeWarningTests.Action.response
-
-          Make sure to use ".receive(on:)" on any effects that execute on background threads to \
-          receive their output on the main thread.
-
-          The "Store" class is not thread-safe, and so all interactions with an instance of \
-          "Store" (including all of its scopes and derived view stores) must be done on the main \
-          thread.
-          """,
-          """
-          failed - An effect completed on a non-main thread. …
-
-            Effect returned from:
-              RuntimeWarningTests.Action.tap
-
-          Make sure to use ".receive(on:)" on any effects that execute on background threads to \
-          receive their output on the main thread.
-
-          The "Store" class is not thread-safe, and so all interactions with an instance of \
-          "Store" (including all of its scopes and derived view stores) must be done on the main \
-          thread.
-          """,
-          """
-          failed - An effect published an action on a non-main thread. …
-
-            Effect published:
-              RuntimeWarningTests.Action.response
-
-            Effect returned from:
-              RuntimeWarningTests.Action.tap
-
-          Make sure to use ".receive(on:)" on any effects that execute on background threads to \
-          receive their output on the main thread.
-
-          The "Store" class is not thread-safe, and so all interactions with an instance of \
-          "Store" (including all of its scopes and derived view stores) must be done on the main \
-          thread.
-          """,
-        ]
-        .contains($0.compactDescription)
-      }
-
-      enum Action { case tap, response }
-      let store = Store(initialState: 0) {
-        Reduce<Int, Action> { state, action in
-          switch action {
-          case .tap:
-            return .publisher {
-              Deferred {
-                Future { callback in
-                  callback(.success(.response))
-                }
-              }
-              .receive(on: DispatchQueue(label: "background"))
-            }
-          case .response:
-            return .none
-          }
-        }
-      }
-      await ViewStore(store, observe: { $0 }).send(.tap).finish()
-    }
-
-    @MainActor
     func testBindingUnhandledAction() {
       let line = #line + 2
       struct State: Equatable {
@@ -192,6 +21,32 @@
         $0.compactDescription == """
           failed - A binding action sent from a store for binding state defined at \
           "\(#fileID):\(line)" was not handled. …
+
+            Action:
+              RuntimeWarningTests.Action.binding(.set(_, 42))
+
+          To fix this, invoke "BindingReducer()" from your feature reducer's "body".
+          """
+      }
+    }
+
+    @ObservableState
+    struct TestObservableBindingUnhandledActionState: Equatable {
+      var count = 0
+    }
+    @MainActor
+    func testObservableBindingUnhandledAction() {
+      typealias State = TestObservableBindingUnhandledActionState
+      enum Action: BindableAction, Equatable {
+        case binding(BindingAction<State>)
+      }
+      let store = Store<State, Action>(initialState: State()) {}
+
+      XCTExpectFailure {
+        store.count = 42
+      } issueMatcher: {
+        $0.compactDescription == """
+          failed - A binding action sent from a store was not handled. …
 
             Action:
               RuntimeWarningTests.Action.binding(.set(_, 42))
@@ -249,8 +104,8 @@
         ] = .init()
       } issueMatcher: {
         $0.compactDescription == """
-          failed - SwiftUI wrote to a "NavigationStack" binding at "file.swift:1" with a path that \
-          has the same number of elements that already exist in the store. SwiftUI should only \
+          failed - A navigation stack binding at "file.swift:1" was written to with a path that \
+          has the same number of elements that already exist in the store. A view should only \
           write to this binding with a path that has pushed a new element onto the stack, or \
           popped one or more elements from the stack.
 
@@ -294,6 +149,7 @@
 
       XCTExpectFailure {
         store[
+          id: nil,
           state: \.destination,
           action: \.destination,
           isInViewBody: false,
@@ -304,8 +160,8 @@
         ] = nil
       } issueMatcher: {
         $0.compactDescription == """
-          failed - SwiftUI dismissed a view through a binding at "file.swift:1", but the store \
-          destination wasn't set to "nil".
+          failed - A binding at "file.swift:1" was set to "nil", but the store destination wasn't \
+          nil'd out.
 
           This usually means an "ifLet" has not been integrated with the reducer powering the \
           store, and this reducer is responsible for handling presentation actions.

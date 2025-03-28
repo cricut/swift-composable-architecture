@@ -1,11 +1,12 @@
 import ComposableArchitecture
-import XCTest
+import Testing
 
 @testable import SyncUps
 
-class SyncUpsListTests: XCTestCase {
-  @MainActor
-  func testAddSyncUp_NonExhaustive() async {
+@MainActor
+struct SyncUpsListTests {
+  @Test
+  func addSyncUpNonExhaustive() async {
     let store = TestStore(initialState: SyncUpsList.State()) {
       SyncUpsList()
     } withDependencies: {
@@ -26,13 +27,13 @@ class SyncUpsListTests: XCTestCase {
     await store.send(\.addSyncUp.binding.syncUp, editedSyncUp)
   }
   
-  @MainActor
-  func testAddSyncUp() async {
+  @Test
+  func addSyncUp() async {
     // ...
   }
 
-  @MainActor
-  func testDeletion() async {
+  @Test
+  func deletion() async {
     // ...
   }
 }

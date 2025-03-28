@@ -60,7 +60,8 @@ import SwiftUI
 /// }
 /// ```
 ///
-/// Enhance its core reducer using ``Reducer/forEach(_:action:element:fileID:line:)-8wpyp``:
+/// Enhance its core reducer using
+/// ``Reducer/forEach(_:action:element:fileID:filePath:line:column:)-6zye8``:
 ///
 /// ```swift
 /// var body: some Reducer<State, Action> {
@@ -104,8 +105,8 @@ import SwiftUI
     "Pass 'ForEach' a store scoped to an identified array and identified action, instead. For more information, see the following article: https://pointfreeco.github.io/swift-composable-architecture/main/documentation/composablearchitecture/migratingto1.7#Replacing-ForEachStore-with-ForEach]"
 )
 public struct ForEachStore<
-  EachState, EachAction, Data: Collection, ID: Hashable, Content: View
->: DynamicViewContent {
+  EachState, EachAction, Data: Collection, ID: Hashable & Sendable, Content: View
+>: View {
   public let data: Data
   let content: Content
 
@@ -115,6 +116,11 @@ public struct ForEachStore<
   /// - Parameters:
   ///   - store: A store on an identified array of data and an identified action.
   ///   - content: A function that can generate content given a store of an element.
+  #if swift(<5.10)
+    @MainActor(unsafe)
+  #else
+    @preconcurrency@MainActor
+  #endif
   public init<EachContent>(
     _ store: Store<IdentifiedArray<ID, EachState>, IdentifiedAction<ID, EachAction>>,
     @ViewBuilder content: @escaping (_ store: Store<EachState, EachAction>) -> EachContent
@@ -127,6 +133,20 @@ public struct ForEachStore<
     >
   {
     self.data = store.withState { $0 }
+
+    func open(
+      _ core: some Core<IdentifiedArray<ID, EachState>, IdentifiedAction<ID, EachAction>>,
+      element: EachState,
+      id: ID
+    ) -> any Core<EachState, EachAction> {
+      IfLetCore(
+        base: core,
+        cachedState: element,
+        stateKeyPath: \.[id: id],
+        actionKeyPath: \.[id: id]
+      )
+    }
+
     self.content = WithViewStore(
       store,
       observe: { $0 },
@@ -134,16 +154,10 @@ public struct ForEachStore<
     ) { viewStore in
       ForEach(viewStore.state, id: viewStore.state.id) { element in
         let id = element[keyPath: viewStore.state.id]
-        var element = element
         content(
           store.scope(
-            id: store.id(state: \.[id:id]!, action: \.[id:id]),
-            state: ToState {
-              element = $0[id: id] ?? element
-              return element
-            },
-            action: { .element(id: id, action: $0) },
-            isInvalid: { !$0.ids.contains(id) }
+            id: store.id(state: \.[id: id]!, action: \.[id: id]),
+            childCore: open(store.core, element: element, id: id)
           )
         )
       }
@@ -174,6 +188,11 @@ public struct ForEachStore<
     message:
       "Use an 'IdentifiedAction', instead. See the following migration guide for more information: https://pointfreeco.github.io/swift-composable-architecture/main/documentation/composablearchitecture/migratingto1.4#Identified-actions"
   )
+  #if swift(<5.10)
+    @MainActor(unsafe)
+  #else
+    @preconcurrency@MainActor
+  #endif
   public init<EachContent>(
     _ store: Store<IdentifiedArray<ID, EachState>, (id: ID, action: EachAction)>,
     @ViewBuilder content: @escaping (_ store: Store<EachState, EachAction>) -> EachContent
@@ -186,23 +205,31 @@ public struct ForEachStore<
     >
   {
     self.data = store.withState { $0 }
+
+    func open(
+      _ core: some Core<IdentifiedArray<ID, EachState>, (id: ID, action: EachAction)>,
+      element: EachState,
+      id: ID
+    ) -> any Core<EachState, EachAction> {
+      IfLetCore(
+        base: core,
+        cachedState: element,
+        stateKeyPath: \.[id: id],
+        actionKeyPath: \.[id: id]
+      )
+    }
+
     self.content = WithViewStore(
       store,
       observe: { $0 },
       removeDuplicates: { areOrderedSetsDuplicates($0.ids, $1.ids) }
     ) { viewStore in
       ForEach(viewStore.state, id: viewStore.state.id) { element in
-        var element = element
         let id = element[keyPath: viewStore.state.id]
         content(
           store.scope(
-            id: store.id(state: \.[id:id]!, action: \.[id:id]),
-            state: ToState {
-              element = $0[id: id] ?? element
-              return element
-            },
-            action: { (id, $0) },
-            isInvalid: { !$0.ids.contains(id) }
+            id: store.id(state: \.[id: id]!, action: \.[id: id]),
+            childCore: open(store.core, element: element, id: id)
           )
         )
       }
@@ -214,8 +241,14 @@ public struct ForEachStore<
   }
 }
 
+#if compiler(>=6)
+  extension ForEachStore: @preconcurrency DynamicViewContent {}
+#else
+  extension ForEachStore: DynamicViewContent {}
+#endif
+
 extension Case {
-  fileprivate subscript<ID: Hashable, Action>(id id: ID) -> Case<Action>
+  fileprivate subscript<ID: Hashable & Sendable, Action>(id id: ID) -> Case<Action>
   where Value == (id: ID, action: Action) {
     Case<Action>(
       embed: { (id: id, action: $0) },

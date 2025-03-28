@@ -1,11 +1,12 @@
 import ComposableArchitecture
 import GameCore
 import NewGameCore
-import XCTest
+import Testing
 
-final class NewGameCoreTests: XCTestCase {
-  @MainActor
-  func testFlow_NewGame_Integration() async {
+@MainActor
+struct NewGameCoreTests {
+  @Test
+  func integration() async {
     let store = TestStore(initialState: NewGame.State()) {
       NewGame()
     }

@@ -25,7 +25,7 @@ let cellIdentifier = "Cell"
 final class CountersTableViewController: UITableViewController {
   private let store: StoreOf<CounterList>
 
-  var observations: [IndexPath: ObservationToken] = [:]
+  var observations: [IndexPath: ObserveToken] = [:]
 
   init(store: StoreOf<CounterList>) {
     self.store = store
@@ -63,7 +63,7 @@ final class CountersTableViewController: UITableViewController {
 
   override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
     let id = store.counters[indexPath.row].id
-    if let store = store.scope(state: \.counters[id:id], action: \.counters[id:id]) {
+    if let store = store.scope(state: \.counters[id: id], action: \.counters[id: id]) {
       navigationController?.pushViewController(CounterViewController(store: store), animated: true)
     }
   }

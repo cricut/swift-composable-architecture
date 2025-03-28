@@ -132,31 +132,25 @@ import SwiftUI
 /// case. Further, all actions sent to the store and all scopes (see ``scope(state:action:)-90255``)
 /// of the store are also checked to make sure that work is performed on the main thread.
 @dynamicMemberLookup
+#if swift(<5.10)
+  @MainActor(unsafe)
+#else
+  @preconcurrency@MainActor
+#endif
 public final class Store<State, Action> {
-  var canCacheChildren = true
-  private var children: [ScopeID<State, Action>: AnyObject] = [:]
-  var _isInvalidated = { false }
+  var children: [ScopeID<State, Action>: AnyObject] = [:]
 
-  @_spi(Internals) public let rootStore: RootStore
-  private let toState: PartialToState<State>
-  private let fromAction: (Action) -> Any
+  let core: any Core<State, Action>
+  @_spi(Internals) public var effectCancellables: [UUID: AnyCancellable] { core.effectCancellables }
 
-  #if canImport(Perception)
-    #if !os(visionOS)
-      let _$observationRegistrar = PerceptionRegistrar(
-        isPerceptionCheckingEnabled: _isStorePerceptionCheckingEnabled
-      )
-    #else
-      let _$observationRegistrar = ObservationRegistrar()
-    #endif
-    private var parentCancellable: AnyCancellable?
+  #if !os(visionOS)
+    let _$observationRegistrar = PerceptionRegistrar(
+      isPerceptionCheckingEnabled: _isStorePerceptionCheckingEnabled
+    )
   #else
-    // NB: This dynamic member lookup is needed to support pre-Observation (<5.9) versions of Swift.
-    @_disfavoredOverload
-    private subscript(dynamicMember keyPath: KeyPath<State, Never>) -> Never {
-      self.currentState[keyPath: keyPath]
-    }
+    let _$observationRegistrar = ObservationRegistrar()
   #endif
+  private var parentCancellable: AnyCancellable?
 
   /// Initializes a store from an initial state and a reducer.
   ///
@@ -181,14 +175,14 @@ public final class Store<State, Action> {
   }
 
   init() {
-    self._isInvalidated = { true }
-    self.rootStore = RootStore(initialState: (), reducer: EmptyReducer<Void, Never>())
-    self.toState = .keyPath(\State.self)
-    self.fromAction = { $0 }
+    self.core = InvalidCore()
   }
 
   deinit {
-    Logger.shared.log("\(storeTypeName(of: self)).deinit")
+    guard Thread.isMainThread else { return }
+    MainActor._assumeIsolated {
+      Logger.shared.log("\(storeTypeName(of: self)).deinit")
+    }
   }
 
   /// Calls the given closure with a snapshot of the current state of the store.
@@ -203,11 +197,7 @@ public final class Store<State, Action> {
   ///   it conforms to ``ObservableState``.
   /// - Returns: The return value, if any, of the `body` closure.
   public func withState<R>(_ body: (_ state: State) -> R) -> R {
-    #if canImport(Perception)
-      _withoutPerceptionChecking { body(self.currentState) }
-    #else
-      body(self.currentState)
-    #endif
+    _withoutPerceptionChecking { body(self.currentState) }
   }
 
   /// Sends an action to the store.
@@ -231,7 +221,7 @@ public final class Store<State, Action> {
   ///   sending the action.
   @discardableResult
   public func send(_ action: Action) -> StoreTask {
-    .init(rawValue: self.send(action, originatingFrom: nil))
+    .init(rawValue: self.send(action))
   }
 
   /// Sends an action to the store with a given animation.
@@ -256,7 +246,7 @@ public final class Store<State, Action> {
   @discardableResult
   public func send(_ action: Action, transaction: Transaction) -> StoreTask {
     withTransaction(transaction) {
-      .init(rawValue: self.send(action, originatingFrom: nil))
+      .init(rawValue: self.send(action))
     }
   }
 
@@ -304,12 +294,28 @@ public final class Store<State, Action> {
     state: KeyPath<State, ChildState>,
     action: CaseKeyPath<Action, ChildAction>
   ) -> Store<ChildState, ChildAction> {
-    self.scope(
-      id: self.id(state: state, action: action),
-      state: ToState(state),
-      action: { action($0) },
-      isInvalid: nil
-    )
+    func open(_ core: some Core<State, Action>) -> any Core<ChildState, ChildAction> {
+      ScopedCore(base: core, stateKeyPath: state, actionKeyPath: action)
+    }
+    return scope(id: id(state: state, action: action), childCore: open(core))
+  }
+
+  func scope<ChildState, ChildAction>(
+    id: ScopeID<State, Action>?,
+    childCore: @autoclosure () -> any Core<ChildState, ChildAction>
+  ) -> Store<ChildState, ChildAction> {
+    guard
+      core.canStoreCacheChildren,
+      let id,
+      let child = children[id] as? Store<ChildState, ChildAction>
+    else {
+      let child = Store<ChildState, ChildAction>(core: childCore())
+      if core.canStoreCacheChildren, let id {
+        children[id] = child
+      }
+      return child
+    }
+    return child
   }
 
   @available(
@@ -321,88 +327,42 @@ public final class Store<State, Action> {
     state toChildState: @escaping (_ state: State) -> ChildState,
     action fromChildAction: @escaping (_ childAction: ChildAction) -> Action
   ) -> Store<ChildState, ChildAction> {
-    self.scope(
-      id: nil,
-      state: ToState(toChildState),
-      action: fromChildAction,
-      isInvalid: nil
-    )
+    _scope(state: toChildState, action: fromChildAction)
+  }
+
+  func _scope<ChildState, ChildAction>(
+    state toChildState: @escaping (_ state: State) -> ChildState,
+    action fromChildAction: @escaping (_ childAction: ChildAction) -> Action
+  ) -> Store<ChildState, ChildAction> {
+    func open(_ core: some Core<State, Action>) -> any Core<ChildState, ChildAction> {
+      ClosureScopedCore(
+        base: core,
+        toState: toChildState,
+        fromAction: fromChildAction
+      )
+    }
+    return scope(id: nil, childCore: open(core))
   }
 
   @_spi(Internals)
   public var currentState: State {
-    threadCheck(status: .state)
-    return self.toState(self.rootStore.state)
+    core.state
   }
 
   @_spi(Internals)
-  public
-    func scope<ChildState, ChildAction>(
-      id: ScopeID<State, Action>?,
-      state: ToState<State, ChildState>,
-      action fromChildAction: @escaping (ChildAction) -> Action,
-      isInvalid: ((State) -> Bool)?
-    ) -> Store<ChildState, ChildAction>
-  {
-    threadCheck(status: .scope)
-
-    if self.canCacheChildren,
-      let id = id,
-      let childStore = self.children[id] as? Store<ChildState, ChildAction>
-    {
-      return childStore
-    }
-    let childStore = Store<ChildState, ChildAction>(
-      rootStore: self.rootStore,
-      toState: self.toState.appending(state.base),
-      fromAction: { [fromAction] in fromAction(fromChildAction($0)) }
-    )
-    childStore._isInvalidated =
-      id == nil || !self.canCacheChildren
-      ? {
-        isInvalid?(self.currentState) == true || self._isInvalidated()
-      }
-      : { [weak self] in
-        guard let self else { return true }
-        return isInvalid?(self.currentState) == true || self._isInvalidated()
-      }
-    childStore.canCacheChildren = self.canCacheChildren && id != nil
-    if let id = id, self.canCacheChildren {
-      self.children[id] = childStore
-    }
-    return childStore
+  @_disfavoredOverload
+  public func send(_ action: Action) -> Task<Void, Never>? {
+    core.send(action)
   }
 
-  @_spi(Internals)
-  public func send(
-    _ action: Action,
-    originatingFrom originatingAction: Action?
-  ) -> Task<Void, Never>? {
-    #if DEBUG
-      if BindingLocal.isActive && self._isInvalidated() {
-        return .none
-      }
-    #endif
-    return self.rootStore.send(self.fromAction(action))
-  }
-
-  private init(
-    rootStore: RootStore,
-    toState: PartialToState<State>,
-    fromAction: @escaping (Action) -> Any
-  ) {
+  private init(core: some Core<State, Action>) {
     defer { Logger.shared.log("\(storeTypeName(of: self)).init") }
-    self.rootStore = rootStore
-    self.toState = toState
-    self.fromAction = fromAction
+    self.core = core
 
-    #if canImport(Perception)
+    if let stateType = State.self as? any ObservableState.Type {
       func subscribeToDidSet<T: ObservableState>(_ type: T.Type) -> AnyCancellable {
-        let toState = toState as! PartialToState<T>
-        return rootStore.didSet
-          .compactMap { [weak rootStore] in
-            rootStore.map { toState($0.state) }?._$id
-          }
+        core.didSet
+          .compactMap { [weak self] in (self?.currentState as? T)?._$id }
           .removeDuplicates()
           .dropFirst()
           .sink { [weak self] _ in
@@ -410,26 +370,15 @@ public final class Store<State, Action> {
             self._$observationRegistrar.withMutation(of: self, keyPath: \.currentState) {}
           }
       }
-
-      if let stateType = State.self as? ObservableState.Type {
-        self.parentCancellable = subscribeToDidSet(stateType)
-      }
-    #endif
+      self.parentCancellable = subscribeToDidSet(stateType)
+    }
   }
 
-  convenience init<R: Reducer>(
+  convenience init<R: Reducer<State, Action>>(
     initialState: R.State,
     reducer: R
-  )
-  where
-    R.State == State,
-    R.Action == Action
-  {
-    self.init(
-      rootStore: RootStore(initialState: initialState, reducer: reducer),
-      toState: .keyPath(\State.self),
-      fromAction: { $0 }
-    )
+  ) {
+    self.init(core: RootCore(initialState: initialState, reducer: reducer))
   }
 
   /// A publisher that emits when state changes.
@@ -444,7 +393,7 @@ public final class Store<State, Action> {
   public var publisher: StorePublisher<State> {
     StorePublisher(
       store: self,
-      upstream: self.rootStore.didSet.map { self.currentState }
+      upstream: self.core.didSet.map { self.currentState }
     )
   }
 
@@ -462,7 +411,7 @@ public final class Store<State, Action> {
 }
 
 extension Store: CustomDebugStringConvertible {
-  public var debugDescription: String {
+  public nonisolated var debugDescription: String {
     storeTypeName(of: self)
   }
 }
@@ -557,10 +506,6 @@ public struct StoreTask: Hashable, Sendable {
   }
 }
 
-private protocol _OptionalProtocol {}
-extension Optional: _OptionalProtocol {}
-extension PresentationState: _OptionalProtocol {}
-
 func storeTypeName<State, Action>(of store: Store<State, Action>) -> String {
   let stateType = typeName(State.self, genericsAbbreviated: false)
   let actionType = typeName(Action.self, genericsAbbreviated: false)
@@ -644,56 +589,13 @@ func typeName(
   return name
 }
 
-@_spi(Internals)
-public struct ToState<State, ChildState> {
-  fileprivate let base: PartialToState<ChildState>
-  @_spi(Internals)
-  public init(_ closure: @escaping (State) -> ChildState) {
-    self.base = .closure { closure($0 as! State) }
+let _isStorePerceptionCheckingEnabled: Bool = {
+  if #available(iOS 17, macOS 14, tvOS 17, watchOS 10, *) {
+    return false
+  } else {
+    return true
   }
-  @_spi(Internals)
-  public init(_ keyPath: KeyPath<State, ChildState>) {
-    self.base = .keyPath(keyPath)
-  }
-}
-
-private enum PartialToState<State> {
-  case closure((Any) -> State)
-  case keyPath(AnyKeyPath)
-  case appended((Any) -> Any, AnyKeyPath)
-  func callAsFunction(_ state: Any) -> State {
-    switch self {
-    case let .closure(closure):
-      return closure(state)
-    case let .keyPath(keyPath):
-      return state[keyPath: keyPath] as! State
-    case let .appended(closure, keyPath):
-      return closure(state)[keyPath: keyPath] as! State
-    }
-  }
-  func appending<ChildState>(_ state: PartialToState<ChildState>) -> PartialToState<ChildState> {
-    switch (self, state) {
-    case let (.keyPath(lhs), .keyPath(rhs)):
-      return .keyPath(lhs.appending(path: rhs)!)
-    case let (.closure(lhs), .keyPath(rhs)):
-      return .appended(lhs, rhs)
-    case let (.appended(lhsClosure, lhsKeyPath), .keyPath(rhs)):
-      return .appended(lhsClosure, lhsKeyPath.appending(path: rhs)!)
-    default:
-      return .closure { state(self($0)) }
-    }
-  }
-}
-
-#if canImport(Perception)
-  let _isStorePerceptionCheckingEnabled: Bool = {
-    if #available(iOS 17, macOS 14, tvOS 17, watchOS 10, *) {
-      return false
-    } else {
-      return true
-    }
-  }()
-#endif
+}()
 
 #if canImport(Observation)
   // NB: This extension must be placed in the same file as 'class Store' due to either a bug

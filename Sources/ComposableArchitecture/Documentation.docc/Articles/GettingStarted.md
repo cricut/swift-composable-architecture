@@ -211,13 +211,13 @@ class FeatureViewController: UIViewController {
   }
 
   @objc private func incrementButtonTapped() {
-    self.viewStore.send(.incrementButtonTapped)
+    self.store.send(.incrementButtonTapped)
   }
   @objc private func decrementButtonTapped() {
-    self.viewStore.send(.decrementButtonTapped)
+    self.store.send(.decrementButtonTapped)
   }
   @objc private func factButtonTapped() {
-    self.viewStore.send(.numberFactButtonTapped)
+    self.store.send(.numberFactButtonTapped)
   }
 }
 ```
@@ -252,15 +252,15 @@ doing much additional work.
 
 ## Testing your feature
 
-> Note: For more in-depth information on testing, see the dedicated <doc:Testing> 
+> Note: For more in-depth information on testing, see the dedicated <doc:TestingTCA> 
 article.
 
 To test use a `TestStore`, which can be created with the same information as the `Store`, but it 
 does extra work to allow you to assert how your feature evolves as actions are sent:
 
 ```swift
-@MainActor
-func testFeature() async {
+@Test
+func basics() async {
   let store = TestStore(initialState: Feature.State()) {
     Feature()
   }
@@ -351,8 +351,8 @@ But in tests we can use a mock dependency that immediately returns a determinist
 fact: 
 
 ```swift
-@MainActor
-func testFeature() async {
+@Test
+func basics() async {
   let store = TestStore(initialState: Feature.State()) {
     Feature(numberFact: { "\($0) is a good number Brent" })
   }
@@ -464,7 +464,7 @@ let store = TestStore(initialState: Feature.State()) {
 
 That is the basics of building and testing a feature in the Composable Architecture. There are 
 _a lot_ more things to be explored. Be sure to check out the <doc:MeetComposableArchitecture> 
-tutorial, as well as dedicated articles on <doc:DependencyManagement>, <doc:Testing>, 
+tutorial, as well as dedicated articles on <doc:DependencyManagement>, <doc:TestingTCA>, 
 <doc:Navigation>, <doc:Performance>, and more. Also, the [Examples][examples] directory has 
 a bunch of projects to explore to see more advanced usages.
 

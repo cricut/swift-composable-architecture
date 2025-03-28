@@ -1,11 +1,12 @@
 import ComposableArchitecture
-import XCTest
+import Testing
 
 @testable import SyncUps
 
-final class RecordMeetingTests: XCTestCase {
-  @MainActor
-  func testTimerFinishes() async {
+@MainActor
+struct RecordMeetingTests {
+  @Test
+  func timerFinishes() async {
     let syncUp = SyncUp(
       id: SyncUp.ID(),
       attendees: [
@@ -16,7 +17,7 @@ final class RecordMeetingTests: XCTestCase {
       title: "Morning Sync"
     )
     let store = TestStore(
-      initialState: RecordMeeting.State(syncUp: Shared(syncUp))
+      initialState: RecordMeeting.State(syncUp: Shared(value: syncUp))
     ) {
       RecordMeeting()
     }

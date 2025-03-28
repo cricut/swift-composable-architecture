@@ -1,11 +1,12 @@
 import ComposableArchitecture
-import XCTest
+import Testing
 
 @testable import SyncUps
 
-class SyncUpsListTests: XCTestCase {
-  @MainActor
-  func testAddSyncUp() async {
+@MainActor
+struct SyncUpsListTests {
+  @Test
+  func addSyncUp() async {
     let store = TestStore(initialState: SyncUpsList.State()) {
       SyncUpsList()
     } withDependencies: {
@@ -26,15 +27,15 @@ class SyncUpsListTests: XCTestCase {
       ],
       title: "Point-Free morning sync"
     )
-    await store.send(\.addSyncUp.binding.syncUp, editedSyncUp)))) {
+    await store.send(\.addSyncUp.binding.syncUp, editedSyncUp) {
       $0.addSyncUp?.syncUp = editedSyncUp
     }
 
     await store.send(.confirmAddButtonTapped)
   }
 
-  @MainActor
-  func testDeletion() async {
+  @Test
+  func deletion() async {
     // ...
   }
 }

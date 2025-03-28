@@ -96,7 +96,7 @@ extension BindingState: Hashable where Value: Hashable {
 }
 
 extension BindingState: Decodable where Value: Decodable {
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     do {
       let container = try decoder.singleValueContainer()
       self.init(wrappedValue: try container.decode(Value.self))
@@ -107,7 +107,7 @@ extension BindingState: Decodable where Value: Decodable {
 }
 
 extension BindingState: Encodable where Value: Encodable {
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     do {
       var container = encoder.singleValueContainer()
       try container.encode(self.wrappedValue)
@@ -143,8 +143,8 @@ extension BindingState: Sendable where Value: Sendable {}
 /// boilerplate typically associated with mutating multiple fields in state.
 ///
 /// Read <doc:Bindings> for more information.
-public struct BindingAction<Root>: CasePathable, Equatable, @unchecked Sendable {
-  public let keyPath: PartialKeyPath<Root>
+public struct BindingAction<Root>: CasePathable, Equatable, Sendable {
+  public let keyPath: _SendablePartialKeyPath<Root>
 
   @usableFromInline
   let set: @Sendable (inout Root) -> Void
@@ -152,7 +152,7 @@ public struct BindingAction<Root>: CasePathable, Equatable, @unchecked Sendable 
   let valueIsEqualTo: @Sendable (Any) -> Bool
 
   init(
-    keyPath: PartialKeyPath<Root>,
+    keyPath: _SendablePartialKeyPath<Root>,
     set: @escaping @Sendable (inout Root) -> Void,
     value: any Sendable,
     valueIsEqualTo: @escaping @Sendable (Any) -> Bool
@@ -173,21 +173,21 @@ public struct BindingAction<Root>: CasePathable, Equatable, @unchecked Sendable 
 
   @dynamicMemberLookup
   public struct AllCasePaths {
-    #if canImport(Perception)
-      public subscript<Value: Equatable>(
-        dynamicMember keyPath: WritableKeyPath<Root, Value>
-      ) -> AnyCasePath<BindingAction, Value> where Root: ObservableState {
-        AnyCasePath(
-          embed: { .set(keyPath, $0) },
-          extract: { $0.keyPath == keyPath ? $0.value as? Value : nil }
-        )
-      }
-    #endif
+    public subscript<Value: Equatable & Sendable>(
+      dynamicMember keyPath: WritableKeyPath<Root, Value>
+    ) -> AnyCasePath<BindingAction, Value> where Root: ObservableState {
+      let keyPath = keyPath.unsafeSendable()
+      return AnyCasePath(
+        embed: { .set(keyPath, $0) },
+        extract: { $0.keyPath == keyPath ? $0.value as? Value : nil }
+      )
+    }
 
-    public subscript<Value: Equatable>(
+    public subscript<Value: Equatable & Sendable>(
       dynamicMember keyPath: WritableKeyPath<Root, BindingState<Value>>
     ) -> AnyCasePath<BindingAction, Value> {
-      AnyCasePath(
+      let keyPath = keyPath.unsafeSendable()
+      return AnyCasePath(
         embed: { .set(keyPath, $0) },
         extract: { $0.keyPath == keyPath ? $0.value as? Value : nil }
       )
@@ -206,7 +206,7 @@ extension BindingAction {
   /// - Returns: An action that describes simple mutations to some root state at a writable key
   ///   path.
   public static func set<Value: Equatable & Sendable>(
-    _ keyPath: WritableKeyPath<Root, BindingState<Value>>,
+    _ keyPath: _SendableWritableKeyPath<Root, BindingState<Value>>,
     _ value: Value
   ) -> Self {
     return .init(
@@ -236,7 +236,7 @@ extension BindingAction {
   }
 
   init<Value: Equatable & Sendable>(
-    keyPath: WritableKeyPath<Root, BindingState<Value>>,
+    keyPath: _SendableWritableKeyPath<Root, BindingState<Value>>,
     set: @escaping @Sendable (_ state: inout Root) -> Void,
     value: Value
   ) {
@@ -291,8 +291,8 @@ extension BindableAction {
   /// Shorthand for `.binding(.set(\.$keyPath, value))`.
   ///
   /// - Returns: A binding action.
-  public static func set<Value: Equatable>(
-    _ keyPath: WritableKeyPath<State, BindingState<Value>>,
+  public static func set<Value: Equatable & Sendable>(
+    _ keyPath: _SendableWritableKeyPath<State, BindingState<Value>>,
     _ value: Value
   ) -> Self {
     self.binding(.set(keyPath, value))
@@ -300,11 +300,11 @@ extension BindableAction {
 }
 
 extension ViewStore where ViewAction: BindableAction, ViewAction.State == ViewState {
-  @MainActor
-  public subscript<Value: Equatable>(
+  public subscript<Value: Equatable & Sendable>(
     dynamicMember keyPath: WritableKeyPath<ViewState, BindingState<Value>>
   ) -> Binding<Value> {
-    self.binding(
+    let keyPath = keyPath.unsafeSendable()
+    return self.binding(
       get: { $0[keyPath: keyPath].wrappedValue },
       send: { value in
         #if DEBUG
@@ -313,7 +313,7 @@ extension ViewStore where ViewAction: BindableAction, ViewAction.State == ViewSt
             value: value,
             bindableActionType: ViewAction.self,
             context: .bindingState,
-            isInvalidated: self.store._isInvalidated,
+            isInvalidated: { [weak self] in self?.store.core.isInvalid ?? true },
             fileID: bindingState.fileID,
             filePath: bindingState.filePath,
             line: bindingState.line,
@@ -321,7 +321,7 @@ extension ViewStore where ViewAction: BindableAction, ViewAction.State == ViewSt
           )
           let set: @Sendable (inout ViewState) -> Void = {
             $0[keyPath: keyPath].wrappedValue = value
-            debugger.wasCalled = true
+            debugger.wasCalled.setValue(true)
           }
         #else
           let set: @Sendable (inout ViewState) -> Void = {
@@ -402,6 +402,11 @@ where Value: CustomDebugStringConvertible {
 /// Read <doc:Bindings> for more information.
 @dynamicMemberLookup
 @propertyWrapper
+#if swift(<5.10)
+  @MainActor(unsafe)
+#else
+  @preconcurrency@MainActor
+#endif
 public struct BindingViewStore<State> {
   let store: Store<State, BindingAction<State>>
   #if DEBUG
@@ -419,12 +424,7 @@ public struct BindingViewStore<State> {
     line: UInt = #line,
     column: UInt = #column
   ) {
-    self.store = store.scope(
-      id: nil,
-      state: ToState(\.self),
-      action: Action.binding,
-      isInvalid: nil
-    )
+    self.store = store._scope(state: { $0 }, action: { .binding($0) })
     #if DEBUG
       self.bindableActionType = type(of: Action.self)
       self.fileID = fileID
@@ -451,10 +451,11 @@ public struct BindingViewStore<State> {
     self.wrappedValue[keyPath: keyPath]
   }
 
-  public subscript<Value: Equatable>(
+  public subscript<Value: Equatable & Sendable>(
     dynamicMember keyPath: WritableKeyPath<State, BindingState<Value>>
   ) -> BindingViewState<Value> {
-    BindingViewState(
+    let keyPath = keyPath.unsafeSendable()
+    return BindingViewState(
       binding: ViewStore(self.store, observe: { $0[keyPath: keyPath].wrappedValue })
         .binding(
           send: { value in
@@ -463,7 +464,7 @@ public struct BindingViewStore<State> {
                 value: value,
                 bindableActionType: self.bindableActionType,
                 context: .bindingStore,
-                isInvalidated: self.store._isInvalidated,
+                isInvalidated: { [weak store] in store?.core.isInvalid ?? true },
                 fileID: self.fileID,
                 filePath: self.filePath,
                 line: self.line,
@@ -471,7 +472,7 @@ public struct BindingViewStore<State> {
               )
               let set: @Sendable (inout State) -> Void = {
                 $0[keyPath: keyPath].wrappedValue = value
-                debugger.wasCalled = true
+                debugger.wasCalled.setValue(true)
               }
             #else
               let set: @Sendable (inout State) -> Void = {
@@ -509,12 +510,7 @@ extension ViewStore {
       observe: { (_: State) in
         toViewState(
           BindingViewStore(
-            store: store.scope(
-              id: nil,
-              state: ToState(\.self),
-              action: fromViewAction,
-              isInvalid: nil
-            )
+            store: store._scope(state: { $0 }, action: fromViewAction)
           )
         )
       },
@@ -583,7 +579,6 @@ extension ViewStore where ViewState: Equatable {
   ///   - store: A store.
   ///   - toViewState: A function that transforms binding store state into observable view state.
   ///     All changes to the view state will cause the `WithViewStore` to re-compute its view.
-  ///   - content: A function that can generate content from a view store.
   @_disfavoredOverload
   public convenience init<State>(
     _ store: Store<State, ViewAction>,
@@ -611,6 +606,8 @@ extension WithViewStore where Content: View {
   ///   - isDuplicate: A function to determine when two `ViewState` values are equal. When values
   ///     are equal, repeat view computations are removed.
   ///   - content: A function that can generate content from a view store.
+  ///   - file: The file.
+  ///   - line: The line.
   @_disfavoredOverload
   public init<State, Action>(
     _ store: Store<State, Action>,
@@ -624,16 +621,7 @@ extension WithViewStore where Content: View {
     self.init(
       store,
       observe: { (_: State) in
-        toViewState(
-          BindingViewStore(
-            store: store.scope(
-              id: nil,
-              state: ToState(\.self),
-              action: fromViewAction,
-              isInvalid: nil
-            )
-          )
-        )
+        toViewState(BindingViewStore(store: store._scope(state: { $0 }, action: fromViewAction)))
       },
       send: fromViewAction,
       removeDuplicates: isDuplicate,
@@ -655,6 +643,8 @@ extension WithViewStore where Content: View {
   ///   - isDuplicate: A function to determine when two `ViewState` values are equal. When values
   ///     are equal, repeat view computations are removed.
   ///   - content: A function that can generate content from a view store.
+  ///   - file: The file.
+  ///   - line: The line.
   @_disfavoredOverload
   public init<State>(
     _ store: Store<State, ViewAction>,
@@ -688,6 +678,8 @@ extension WithViewStore where ViewState: Equatable, Content: View {
   ///     All changes to the view state will cause the `WithViewStore` to re-compute its view.
   ///   - fromViewAction: A function that transforms view actions into store action.
   ///   - content: A function that can generate content from a view store.
+  ///   - file: The file.
+  ///   - line: The line.
   @_disfavoredOverload
   public init<State, Action>(
     _ store: Store<State, Action>,
@@ -718,6 +710,8 @@ extension WithViewStore where ViewState: Equatable, Content: View {
   ///   - toViewState: A function that transforms binding store state into observable view state.
   ///     All changes to the view state will cause the `WithViewStore` to re-compute its view.
   ///   - content: A function that can generate content from a view store.
+  ///   - file: The file.
+  ///   - line: The line.
   @_disfavoredOverload
   public init<State>(
     _ store: Store<State, ViewAction>,
@@ -738,7 +732,7 @@ extension WithViewStore where ViewState: Equatable, Content: View {
 }
 
 #if DEBUG
-  private final class BindableActionViewStoreDebugger<Value> {
+  private final class BindableActionViewStoreDebugger<Value: Sendable>: Sendable {
     enum Context {
       case bindingState
       case bindingStore
@@ -748,18 +742,18 @@ extension WithViewStore where ViewState: Equatable, Content: View {
     let value: Value
     let bindableActionType: Any.Type
     let context: Context
-    let isInvalidated: () -> Bool
+    let isInvalidated: @MainActor @Sendable () -> Bool
     let fileID: StaticString
     let filePath: StaticString
     let line: UInt
     let column: UInt
-    var wasCalled = false
+    let wasCalled = LockIsolated(false)
 
     init(
       value: Value,
       bindableActionType: Any.Type,
       context: Context,
-      isInvalidated: @escaping () -> Bool,
+      isInvalidated: @escaping @MainActor @Sendable () -> Bool,
       fileID: StaticString,
       filePath: StaticString,
       line: UInt,
@@ -776,16 +770,14 @@ extension WithViewStore where ViewState: Equatable, Content: View {
     }
 
     deinit {
-      // NB: `isInvalidated()` can access store state, which must happen on the main thread.
-      let isInvalidated =
-        Thread.isMainThread
-        ? self.isInvalidated()
-        : DispatchQueue.main.sync(execute: self.isInvalidated)
-
+      let isInvalidated = mainActorNow(execute: isInvalidated)
       guard !isInvalidated else { return }
-      guard self.wasCalled else {
-        var value = ""
-        customDump(self.value, to: &value, maxDepth: 0)
+      guard self.wasCalled.value else {
+        var valueDump: String {
+          var valueDump = ""
+          customDump(self.value, to: &valueDump, maxDepth: 0)
+          return valueDump
+        }
         reportIssue(
           """
           A binding action sent from a store \
@@ -793,7 +785,7 @@ extension WithViewStore where ViewState: Equatable, Content: View {
           "\(self.fileID):\(self.line)" was not handled. …
 
             Action:
-              \(typeName(self.bindableActionType)).binding(.set(_, \(value)))
+              \(typeName(self.bindableActionType)).binding(.set(_, \(valueDump)))
 
           To fix this, invoke "BindingReducer()" from your feature reducer's "body".
           """,

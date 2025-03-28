@@ -1,15 +1,17 @@
 import ComposableArchitecture
-import XCTest
+import Foundation
+import Testing
 
 @testable import SwiftUICaseStudies
 
-final class ReusableComponentsDownloadComponentTests: XCTestCase {
-  @MainActor
-  func testDownloadFlow() async {
+@MainActor
+struct ReusableComponentsDownloadComponentTests {
+  @Test
+  func downloadFlow() async {
     let download = AsyncThrowingStream.makeStream(of: DownloadClient.Event.self)
     let store = TestStore(
       initialState: DownloadComponent.State(
-        id: 1,
+        id: AnyHashableSendable(1),
         mode: .notDownloaded,
         url: URL(string: "https://www.pointfree.co")!
       )
@@ -35,12 +37,12 @@ final class ReusableComponentsDownloadComponentTests: XCTestCase {
     }
   }
 
-  @MainActor
-  func testCancelDownloadFlow() async {
+  @Test
+  func cancelDownloadFlow() async {
     let download = AsyncThrowingStream.makeStream(of: DownloadClient.Event.self)
     let store = TestStore(
       initialState: DownloadComponent.State(
-        id: 1,
+        id: AnyHashableSendable(1),
         mode: .notDownloaded,
         url: URL(string: "https://www.pointfree.co")!
       )
@@ -78,12 +80,12 @@ final class ReusableComponentsDownloadComponentTests: XCTestCase {
     }
   }
 
-  @MainActor
-  func testDownloadFinishesWhileTryingToCancel() async {
+  @Test
+  func downloadFinishesWhileTryingToCancel() async {
     let download = AsyncThrowingStream.makeStream(of: DownloadClient.Event.self)
     let store = TestStore(
       initialState: DownloadComponent.State(
-        id: 1,
+        id: AnyHashableSendable(1),
         mode: .notDownloaded,
         url: URL(string: "https://www.pointfree.co")!
       )
@@ -120,12 +122,12 @@ final class ReusableComponentsDownloadComponentTests: XCTestCase {
     await task.finish()
   }
 
-  @MainActor
-  func testDeleteDownloadFlow() async {
+  @Test
+  func deleteDownloadFlow() async {
     let download = AsyncThrowingStream.makeStream(of: DownloadClient.Event.self)
     let store = TestStore(
       initialState: DownloadComponent.State(
-        id: 1,
+        id: AnyHashableSendable(1),
         mode: .downloaded,
         url: URL(string: "https://www.pointfree.co")!
       )

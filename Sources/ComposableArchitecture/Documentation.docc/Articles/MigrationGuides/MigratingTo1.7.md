@@ -170,7 +170,7 @@ IfLetStore(store: store.scope(state: \.child, action: \.child)) { childStore in
 }
 ```
 
-This can now be updated to use plain `if let` syntax with ``Store/scope(state:action:)-36e72``:
+This can now be updated to use plain `if let` syntax with ``Store/scope(state:action:)-90255``:
 
 ```swift
 if let childStore = store.scope(state: \.child, action: \.child) {
@@ -212,7 +212,7 @@ ForEachStore(
 ```
 
 This can now be updated to use the vanilla `ForEach` view in SwiftUI, along with 
-``Store/scope(state:action:)-1nelp``, identified by the state of each row:
+``Store/scope(state:action:)-90255``, identified by the state of each row:
 
 ```swift
 ForEach(
@@ -538,7 +538,7 @@ property wrapper:
 ```
 
 And the original code can now be updated to our custom initializer 
-``SwiftUI/NavigationStack/init(path:root:destination:fileID:line:)`` on `NavigationStack`:
+``SwiftUI/NavigationStack/init(path:root:destination:fileID:filePath:line:column:)`` on `NavigationStack`:
 
 ```swift
 NavigationStack(path: $store.scope(state: \.path, action: \.path)) {
@@ -889,6 +889,8 @@ rather than going through ``Store/send(_:)``:
 
 ## Observing for UIKit
 
+### Replacing Store.publisher
+
 Prior to the observation tools one would typically subscribe to changes in the store via a Combine
 publisher in the entry point of a view, such as `viewDidLoad` in a `UIViewController` subclass:
 
@@ -902,7 +904,7 @@ func viewDidLoad() {
 }
 ```
 
-This can now be done more simply using the ``ObjectiveC/NSObject/observe(_:)`` method defined on
+This can now be done more simply using the ``ObjectiveC/NSObject/observe(_:)-94oxy`` method defined on
 all `NSObject`s:
 
 ```swift
@@ -918,8 +920,37 @@ func viewDidLoad() {
 }
 ```
 
-Be sure to read the documentation for ``ObjectiveC/NSObject/observe(_:)`` to learn how to best 
+Be sure to read the documentation for ``ObjectiveC/NSObject/observe(_:)-94oxy`` to learn how to best 
 wield this tool.
+
+### Replacing Store.ifLet
+
+Prior to the observation tools one would typically subscribe to optional child stores via a Combine
+operation provided by the library:
+
+```swift
+store
+  .scope(state: \.child, action: \.child)
+  .ifLet { childStore in
+    // Use child store, _e.g._ create a child view controller
+  } else: {
+    // Perform clean up work, _e.g._ dismiss child view controller
+  }
+  .store(in: &cancellables)
+```
+
+This can now be done more simply using the `observe` method and
+``Store/scope(state:action:fileID:filePath:line:column:)-3yvuf``:
+
+```swift
+observe {
+  if let childStore = store.scope(state: \.child, action: \.child) {
+    // Use child store, _e.g._ create a child view controller
+  } else {
+    // Perform clean up work, _e.g._ dismiss child view controller
+  }
+}
+```
 
 ## Incrementally migrating
 

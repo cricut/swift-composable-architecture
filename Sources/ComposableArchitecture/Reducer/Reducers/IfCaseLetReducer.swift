@@ -49,6 +49,10 @@ extension Reducer {
   ///   - toCaseAction: A case path from parent action to a case containing child actions.
   ///   - case: A reducer that will be invoked with child actions against child state when it is
   ///     present
+  ///   - fileID: The fileID.
+  ///   - filePath: The filePath.
+  ///   - line: The line.
+  ///   - column: The column.
   /// - Returns: A reducer that combines the child reducer with the parent reducer.
   @inlinable
   @warn_unqualified_access
@@ -230,7 +234,7 @@ public struct _IfCaseLetReducer<Parent: Reducer, Child: Reducer>: Reducer {
         before child state changes to another case, especially if it is a long-living effect.
 
         • This action was sent to the store while state was another case. Make sure that actions \
-        for this reducer can only be sent from a view store when state is set to the appropriate \
+        for this reducer can only be sent from a store when state is set to the appropriate \
         case. In SwiftUI applications, use "SwitchStore".
         """,
         fileID: fileID,
@@ -246,7 +250,7 @@ public struct _IfCaseLetReducer<Parent: Reducer, Child: Reducer>: Reducer {
     return self.child
       .dependency(\.navigationIDPath, newNavigationID)
       .reduce(into: &childState, action: childAction)
-      .map { self.toChildAction.embed($0) }
+      .map { [toChildAction] in toChildAction.embed($0) }
       .cancellable(id: childID)
   }
 }

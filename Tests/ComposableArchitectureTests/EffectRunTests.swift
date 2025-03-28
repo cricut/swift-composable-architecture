@@ -3,11 +3,10 @@ import ComposableArchitecture
 import XCTest
 
 final class EffectRunTests: BaseTCATestCase {
-  @MainActor
   func testRun() async {
     struct State: Equatable {}
     enum Action: Equatable { case tapped, response }
-    let store = TestStore(initialState: State()) {
+    let store = await TestStore(initialState: State()) {
       Reduce<State, Action> { state, action in
         switch action {
         case .tapped:
@@ -21,11 +20,10 @@ final class EffectRunTests: BaseTCATestCase {
     await store.receive(.response)
   }
 
-  @MainActor
   func testRunCatch() async {
     struct State: Equatable {}
     enum Action: Equatable { case tapped, response }
-    let store = TestStore(initialState: State()) {
+    let store = await TestStore(initialState: State()) {
       Reduce<State, Action> { state, action in
         switch action {
         case .tapped:
@@ -79,12 +77,11 @@ final class EffectRunTests: BaseTCATestCase {
     }
   #endif
 
-  @MainActor
   func testRunCancellation() async {
     enum CancelID { case response }
     struct State: Equatable {}
     enum Action: Equatable { case tapped, response }
-    let store = TestStore(initialState: State()) {
+    let store = await TestStore(initialState: State()) {
       Reduce<State, Action> { state, action in
         switch action {
         case .tapped:
@@ -102,12 +99,11 @@ final class EffectRunTests: BaseTCATestCase {
     await store.send(.tapped).finish()
   }
 
-  @MainActor
   func testRunCancellationCatch() async {
     enum CancelID { case responseA }
     struct State: Equatable {}
     enum Action: Equatable { case tapped, responseA, responseB }
-    let store = TestStore(initialState: State()) {
+    let store = await TestStore(initialState: State()) {
       Reduce<State, Action> { state, action in
         switch action {
         case .tapped:
@@ -128,7 +124,7 @@ final class EffectRunTests: BaseTCATestCase {
   }
 
   @MainActor
-  func testRunEscapeFailure() async {
+  func testRunEscapeFailure() async throws {
     XCTExpectFailure {
       $0.compactDescription == """
         failed - An action was sent from a completed effect:
@@ -167,8 +163,9 @@ final class EffectRunTests: BaseTCATestCase {
       }
     }
 
-    let viewStore = ViewStore(store, observe: { $0 })
-    await viewStore.send(.tap).finish()
+    await store.send(.tap).finish()
     await queue.advance(by: .seconds(1))
+
+    try await Task.sleep(nanoseconds: 100_000_000)
   }
 }

@@ -1,12 +1,12 @@
-
 import ComposableArchitecture
-import XCTest
+import Testing
 
 @testable import SyncUps
 
-class SyncUpFormTests: XCTestCase {
-  @MainActor
-  func testAddAttendee() async {
+@MainActor
+struct SyncUpFormTests {
+  @Test
+  func addAttendee() async {
     let store = TestStore(
       initialState: SyncUpForm.State(
         syncUp: SyncUp(id: SyncUp.ID())
@@ -23,13 +23,13 @@ class SyncUpFormTests: XCTestCase {
     }
   }
 
-  @MainActor
-  func testRemoveFocusedAttendee() async {
+  @Test
+  func removeFocusedAttendee() async {
     // ...
   }
 
-  @MainActor
-  func testRemoveAttendee() async {
+  @Test
+  func removeAttendee() async {
     // ...
   }
 }

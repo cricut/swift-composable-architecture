@@ -3,7 +3,7 @@ import SwiftUI
 
 @Reducer
 struct SyncUpDetail {
-  @Reducer(state: .equatable)
+  @Reducer
   enum Destination {
     case alert(AlertState<Alert>)
     case edit(SyncUpForm)
@@ -34,8 +34,8 @@ struct SyncUpDetail {
       switch action {
       // case .alert(.presented(.confirmButtonTapped)):
       case .destination(.presented(.alert(.confirmButtonTapped))):
-        @Shared(.fileStorage(.syncUps)) var syncUps: IdentifiedArrayOf<SyncUp> = []
-        syncUps.remove(id: state.syncUp.id)
+        @Shared(.syncUps) var syncUps
+        $syncUps.withLock { _ = $0.remove(id: state.syncUp.id) }
         return .run { _ in await dismiss() }
 
       case .destination:
@@ -52,7 +52,7 @@ struct SyncUpDetail {
       case .doneEditingButtonTapped:
         guard let editedSyncUp = state.destination?.edit?.syncUp
         else { return .none }
-        state.syncUp = editedSyncUp
+        state.$syncUp.withLock { $0 = editedSyncUp }
         state.destination = nil
         return .none
 
@@ -65,6 +65,7 @@ struct SyncUpDetail {
     .ifLet(\.$destination, action: \.destination)
   }
 }
+extension SyncUpDetail.Destination.State: Equatable {}
 
 extension AlertState where Action == SyncUpDetail.Action.Alert {
   static let deleteSyncUp = Self {

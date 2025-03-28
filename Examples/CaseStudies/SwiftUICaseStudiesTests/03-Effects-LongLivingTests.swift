@@ -1,11 +1,12 @@
 import ComposableArchitecture
-import XCTest
+import Testing
 
 @testable import SwiftUICaseStudies
 
-final class LongLivingEffectsTests: XCTestCase {
-  @MainActor
-  func testReducer() async {
+@MainActor
+struct LongLivingEffectsTests {
+  @Test
+  func basics() async {
     let (screenshots, takeScreenshot) = AsyncStream.makeStream(of: Void.self)
 
     let store = TestStore(initialState: LongLivingEffects.State()) {

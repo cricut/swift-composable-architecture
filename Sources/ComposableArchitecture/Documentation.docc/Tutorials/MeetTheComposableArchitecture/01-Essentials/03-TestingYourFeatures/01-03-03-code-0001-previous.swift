@@ -1,8 +1,8 @@
 import ComposableArchitecture
-import XCTest
+import Testing
 
 @testable import CounterApp
 
 @MainActor
-final class CounterFeatureTests: XCTestCase {
+struct CounterFeatureTests {
 }

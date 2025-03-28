@@ -1,7 +1,7 @@
 import SwiftUI
 
 extension View {
-  /// Displays a legacy alert when then store's state becomes non-`nil`, and dismisses it when it
+  /// Displays a legacy alert when the store's state becomes non-`nil`, and dismisses it when it
   /// becomes `nil`.
   ///
   /// - Parameters:
@@ -15,13 +15,18 @@ extension View {
   @available(
     watchOS, introduced: 6, deprecated: 100000, message: "use `View.alert(store:) instead."
   )
+  #if swift(<5.10)
+    @MainActor(unsafe)
+  #else
+    @preconcurrency@MainActor
+  #endif
   public func legacyAlert<ButtonAction>(
     store: Store<PresentationState<AlertState<ButtonAction>>, PresentationAction<ButtonAction>>
   ) -> some View {
     self.legacyAlert(store: store, state: { $0 }, action: { $0 })
   }
 
-  /// Displays a legacy alert when then store's state becomes non-`nil`, and dismisses it when it
+  /// Displays a legacy alert when the store's state becomes non-`nil`, and dismisses it when it
   /// becomes `nil`.
   ///
   /// - Parameters:
@@ -54,6 +59,11 @@ extension View {
     deprecated: 100000,
     message: "use `View.alert(store:state:action:) instead."
   )
+  #if swift(<5.10)
+    @MainActor(unsafe)
+  #else
+    @preconcurrency@MainActor
+  #endif
   public func legacyAlert<State, Action, ButtonAction>(
     store: Store<PresentationState<State>, PresentationAction<Action>>,
     state toDestinationState: @escaping (_ state: State) -> AlertState<ButtonAction>?,

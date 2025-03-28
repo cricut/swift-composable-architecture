@@ -16,12 +16,13 @@ It also allows for complex and recursive navigation paths in your application.
   * [Dismissal](#Dismissal)
   * [Testing](#Testing)
   * [StackState vs NavigationPath](#StackState-vs-NavigationPath)
+  * [UIKit](#UIKit)
 
 ## Basics
 
 The tools for this style of navigation include ``StackState``, ``StackAction`` and the
-``Reducer/forEach(_:action:destination:fileID:line:)-582rd`` operator, as well as a new 
-initializer ``SwiftUI/NavigationStack/init(path:root:destination:fileID:line:)`` on 
+``Reducer/forEach(_:action:destination:fileID:filePath:line:column:)-9svqb`` operator, as well as a new 
+initializer ``SwiftUI/NavigationStack/init(path:root:destination:fileID:filePath:line:column:)`` on 
 `NavigationStack` that behaves like the normal initializer, but is tuned specifically for 
 the Composable Architecture.
 
@@ -95,7 +96,7 @@ That completes the steps to integrate the child and parent features together for
 
 Next we must integrate the child and parent views together. This is done by a 
 `NavigationStack` using a special initializer that comes with this library, called
-``SwiftUI/NavigationStack/init(path:root:destination:fileID:line:)``. This initializer takes 3 
+``SwiftUI/NavigationStack/init(path:root:destination:fileID:filePath:line:column:)``. This initializer takes 3 
 arguments: a binding of a store focused in on ``StackState`` and ``StackAction`` in your domain, a 
 trailing view builder for the root view of the stack, and another trailing view builder for all of 
 the views that can be pushed onto the stack:
@@ -175,9 +176,9 @@ Continue reading into <doc:StackBasedNavigation#Integration> for more informatio
 
 There are two primary ways to push features onto the stack once you have their domains integrated
 and `NavigationStack` in the view, as described above. The simplest way is to use the 
-``SwiftUI/NavigationLink/init(state:label:fileID:line:)`` initializer on `NavigationLink`, which
-requires you to specify the state of the feature you want to push onto the stack. You must specify
-the full state, going all the way back to the `Path` reducer's state:
+``SwiftUI/NavigationLink/init(state:label:fileID:filePath:line:column:)`` initializer on 
+`NavigationLink`, which requires you to specify the state of the feature you want to push onto the 
+stack. You must specify the full state, going all the way back to the `Path` reducer's state:
 
 ```swift
 Form {
@@ -254,8 +255,9 @@ case let .path(.element(id: id, action: .editItem(.saveButtonTapped))):
 Note that when destructuring the ``StackAction/element(id:action:)`` action we get access to not
 only the action that happened in the child domain, but also the ID of the element in the stack.
 ``StackState`` automatically manages IDs for every feature added to the stack, which can be used
-to look up specific elements in the stack using ``StackState/subscript(id:)`` and pop elements 
-from the stack using ``StackState/pop(from:)``.
+to look up specific elements in the stack using 
+``StackState/subscript(id:fileID:filePath:line:column:)`` and pop elements from the stack using
+``StackState/pop(from:)``.
 
 ## Dismissal
 
@@ -318,7 +320,8 @@ struct Feature {
 ```
 
 > Note: The ``DismissEffect`` function is async which means it cannot be invoked directly inside a 
-> reducer. Instead it must be called from ``Effect/run(priority:operation:catch:fileID:line:)``
+> reducer. Instead it must be called from 
+> ``Effect/run(priority:operation:catch:fileID:filePath:line:column:)``.
 
 When `self.dismiss()` is invoked it will remove the corresponding value from the ``StackState``
 powering the navigation stack. It does this by sending a ``StackAction/popFrom(id:)`` action back
@@ -347,7 +350,7 @@ with the parent.
 ## Testing
 
 A huge benefit of using the tools of this library to model navigation stacks is that testing becomes 
-quite easy. Further, using "non-exhaustive testing" (see <doc:Testing#Non-exhaustive-testing>) can 
+quite easy. Further, using "non-exhaustive testing" (see <doc:TestingTCA#Non-exhaustive-testing>) can 
 be very useful for testing navigation since you often only want to assert on a few high level 
 details and not all state mutations and effects.
 
@@ -422,7 +425,8 @@ feature's count is incremented above 5 it will dismiss itself. To do this we wil
 ``TestStore`` for `Feature` that starts in a state with a single counter already on the stack:
 
 ```swift
-func testDismissal() {
+@Test
+func dismissal() {
   let store = TestStore(
     initialState: Feature.State(
       path: StackState([
@@ -506,8 +510,8 @@ await store.send(\.path[id: 0].counter.incrementButtonTapped) {
 
 And then we finally expect that the child dismisses itself, which manifests itself as the 
 ``StackAction/popFrom(id:)`` action being sent to pop the counter feature off the stack, which we 
-can assert using the ``TestStore/receive(_:timeout:assert:file:line:)-6325h`` method on
-``TestStore``:
+can assert using the ``TestStore/receive(_:timeout:assert:fileID:file:line:column:)-53wic`` method 
+on ``TestStore``:
 
 ```swift
 await store.receive(\.path.popFrom) {
@@ -533,18 +537,19 @@ other in a navigation stack.
 However, the more complex the features become, the more cumbersome testing their integration can be.
 By default, ``TestStore`` requires us to be exhaustive in our assertions. We must assert on how
 every piece of state changes, how every effect feeds data back into the system, and we must make
-sure that all effects finish by the end of the test (see <doc:Testing> for more info).
+sure that all effects finish by the end of the test (see <doc:TestingTCA> for more info).
 
 But ``TestStore`` also supports a form of testing known as "non-exhaustive testing" that allows you
 to assert on only the parts of the features that you actually care about (see 
-<doc:Testing#Non-exhaustive-testing> for more info).
+<doc:TestingTCA#Non-exhaustive-testing> for more info).
 
 For example, if we turn off exhaustivity on the test store (see ``TestStore/exhaustivity``) then we
 can assert at a high level that when the increment button is tapped twice that eventually we receive
 a ``StackAction/popFrom(id:)`` action:
 
 ```swift
-func testDismissal() {
+@Test
+func dismissal() {
   let store = TestStore(
     initialState: Feature.State(
       path: StackState([
@@ -651,3 +656,34 @@ compile-time guarantees, and that it is the perfect tool for modeling navigation
 Composable Architecture.
 
 [nav-path-docs]: https://developer.apple.com/documentation/swiftui/navigationpath
+
+## UIKit
+
+The library also comes with a tool that allows you to use UIKit's `UINavigationController` in a 
+state-driven manner. If you model your domains using ``StackState`` as described above, then you 
+can use the special `NavigationStackController` type to implement a view controller for your stack:
+
+```swift
+class AppController: NavigationStackController {
+  private var store: StoreOf<AppFeature>!
+
+  convenience init(store: StoreOf<AppFeature>) {
+    @UIBindable var store = store
+
+    self.init(path: $store.scope(state: \.path, action: \.path)) {
+      RootViewController(store: store)
+    } destination: { store in 
+      switch store.case {
+      case .addItem(let store):
+        AddViewController(store: store)
+      case .detailItem(let store):
+        DetailViewController(store: store)
+      case .editItem(let store):
+        EditViewController(store: store)
+      }
+    }
+
+    self.store = store
+  }
+}
+```

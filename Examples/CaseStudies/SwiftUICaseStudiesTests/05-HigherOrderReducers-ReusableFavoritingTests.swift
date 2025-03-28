@@ -1,11 +1,13 @@
 import ComposableArchitecture
-import XCTest
+import Foundation
+import Testing
 
 @testable import SwiftUICaseStudies
 
-final class ReusableComponentsFavoritingTests: XCTestCase {
-  @MainActor
-  func testHappyPath() async {
+@MainActor
+struct ReusableComponentsFavoritingTests {
+  @Test
+  func happyPath() async {
     let clock = TestClock()
 
     let episodes: IdentifiedArrayOf<Episode.State> = [
@@ -34,24 +36,24 @@ final class ReusableComponentsFavoritingTests: XCTestCase {
       )
     }
 
-    await store.send(\.episodes[id:UUID(0)].favorite.buttonTapped) {
+    await store.send(\.episodes[id: UUID(0)].favorite.buttonTapped) {
       $0.episodes[id: UUID(0)]?.isFavorite = true
     }
     await clock.advance(by: .seconds(1))
-    await store.receive(\.episodes[id:episodes[0].id].favorite.response.success)
+    await store.receive(\.episodes[id: episodes[0].id].favorite.response.success)
 
-    await store.send(\.episodes[id:episodes[1].id].favorite.buttonTapped) {
+    await store.send(\.episodes[id: episodes[1].id].favorite.buttonTapped) {
       $0.episodes[id: UUID(1)]?.isFavorite = true
     }
-    await store.send(\.episodes[id:episodes[1].id].favorite.buttonTapped) {
+    await store.send(\.episodes[id: episodes[1].id].favorite.buttonTapped) {
       $0.episodes[id: UUID(1)]?.isFavorite = false
     }
     await clock.advance(by: .seconds(1))
-    await store.receive(\.episodes[id:episodes[1].id].favorite.response.success)
+    await store.receive(\.episodes[id: episodes[1].id].favorite.response.success)
   }
 
-  @MainActor
-  func testUnhappyPath() async {
+  @Test
+  func unhappyPath() async {
     let episodes: IdentifiedArrayOf<Episode.State> = [
       Episode.State(
         id: UUID(0),
@@ -63,17 +65,17 @@ final class ReusableComponentsFavoritingTests: XCTestCase {
       Episodes(favorite: { _, _ in throw FavoriteError() })
     }
 
-    await store.send(\.episodes[id:UUID(0)].favorite.buttonTapped) {
+    await store.send(\.episodes[id: UUID(0)].favorite.buttonTapped) {
       $0.episodes[id: UUID(0)]?.isFavorite = true
     }
 
-    await store.receive(\.episodes[id:episodes[0].id].favorite.response.failure) {
+    await store.receive(\.episodes[id: episodes[0].id].favorite.response.failure) {
       $0.episodes[id: UUID(0)]?.alert = AlertState {
         TextState("Favoriting failed.")
       }
     }
 
-    await store.send(\.episodes[id:UUID(0)].favorite.alert.dismiss) {
+    await store.send(\.episodes[id: UUID(0)].favorite.alert.dismiss) {
       $0.episodes[id: UUID(0)]?.alert = nil
       $0.episodes[id: UUID(0)]?.isFavorite = false
     }
